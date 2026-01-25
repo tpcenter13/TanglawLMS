@@ -276,41 +276,18 @@ $providers = getAllProviders($conn);
             height: 100%;
         }
         .main-content { 
-            margin-left: 260px;
-            margin-top: 120px;
-            padding-top: 10px;
-            padding-bottom: 60px;
-            height: calc(100vh - 60px);
-            overflow-y: scroll;
-            box-sizing: border-box;
-        }
+    margin-left: 260px;
+    padding-top: 80px; /* header (60px) + breathing space */
+    padding-bottom: 60px;
+    height: 100vh;
+    overflow-y: auto;
+}
         .main-content .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 0 20px;
         }
-        .admin-nav {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-        }
-        .admin-nav button {
-            padding: 10px 15px;
-            border: none;
-            background: #e5e7eb;
-            cursor: pointer;
-            border-radius: 6px;
-            font-weight: 600;
-        }
-        .admin-nav button.active {
-            background: var(--accent);
-            color: white;
-        }
-        .admin-nav button:hover {
-            background: var(--accent);
-            color: white;
-        }
+        
         .section { 
             display: none; 
         }
@@ -591,7 +568,7 @@ $providers = getAllProviders($conn);
     <?php endif; ?>
     
     <!-- DASHBOARD SECTION -->
-   <br> <br> <br> <br> <br>
+   <br> <br> <br>
     <div class="section <?= $section == 'dashboard' ? 'active' : '' ?>">
         <div class="grid">
             <div class="card">
