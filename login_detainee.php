@@ -6,7 +6,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Detainee Login - Tanglaw LMS</title>
+    <title>Detainee Login - Tanglaw Learn</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
         :root{--card-bg:#fff;--accent:#b45309;--muted:#6b7280}

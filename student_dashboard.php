@@ -1,6 +1,15 @@
 <?php
 include 'conn.php';
 include 'header.php';
+session_start();
+
+// FIX: Ensure logged user exists
+if (!isset($_SESSION['loggedUser'])) {
+    header("Location: login.php");
+    exit();
+}
+
+$loggedUser = $_SESSION['loggedUser']; // retrieve the logged-in user
 
 // include sidebar and wrap content so layout matches other dashboards
 include 'sidebar.php';
@@ -11,6 +20,7 @@ echo "<div class=\"main-content\">\n";
 $student = $loggedUser;
 $studentId = $student['id'];
 $grade = $student['grade_level'];
+
 
 // Resolve grade_level text to grade_levels.id (modules use grade_level_id FK)
 $gradeId = null;

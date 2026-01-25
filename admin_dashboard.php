@@ -32,8 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $_POST['email'] ?? '',
                 $_POST['position'] ?? '',
                 $_POST['provider_id'] ?? null,
-                // Accept either 'level' (existing) or 'year' (if UI used that name)
-                $_POST['level'] ?? ($_POST['year'] ?? null),
+                $_POST['level'] ?? null,
                 null,
                 !empty($_POST['new_password']) ? $_POST['new_password'] : null
             );
@@ -48,16 +47,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $message = 'Please fill in all fields.';
         } else {
             // Do not accept file on Add Teacher (per request). Pass null for profile_file.
-            // Accept either 'level' or 'year' form field names (map year -> level)
-            $postedLevel = $_POST['level'] ?? ($_POST['year'] ?? null);
             $result = addTeacher(
                 $conn,
                 $_POST['id_number'],
                 $_POST['name'],
                 $_POST['email'] ?? '',
                 $_POST['position'] ?? '',
+              	$_POST['level'] ?? '',
+                $_POST['school'] ?? '',
                 !empty($_POST['provider_id']) ? (int)$_POST['provider_id'] : null,
-                $postedLevel,
+                $_POST['level'] ?? null,
                 null,
                 !empty($_POST['password']) ? $_POST['password'] : null
             );
@@ -204,17 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     // ====== PASSWORD ACTIONS ======
-    if ($action == 'bulk_generate_passwords') {
-        $res = bulkGenerateMissingPasswords($conn);
-        if ($res['success']) {
-            $message = '✅ Bulk password generation completed.';
-            if (!empty($res['details'])) {
-                $message .= ' Details: ' . json_encode($res['details']);
-            }
-        } else {
-            $message = '❌ Bulk generation failed.';
-        }
-    }
+   
 
     if ($action == 'send_reset_email') {
         $role = $_POST['role'] ?? '';
@@ -267,7 +256,7 @@ $providers = getAllProviders($conn);
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
         .admin-header {
-            background: linear-gradient(90deg, #1e40af 0%, #2563eb 100%);
+            background: linear-gradient(90deg, #003049 0%, #003049 100%);
             color: white;
             padding: 20px;
             border-radius: 0;
@@ -291,9 +280,9 @@ $providers = getAllProviders($conn);
         }
         .main-content { 
             margin-left: 260px;
-            margin-top: 60px;
-            padding-top: 20px;
-            padding-bottom: 40px;
+            margin-top: 120px;
+            padding-top: 10px;
+            padding-bottom: 60px;
             height: calc(100vh - 60px);
             overflow-y: scroll;
             box-sizing: border-box;
@@ -399,7 +388,7 @@ $providers = getAllProviders($conn);
             border-radius: 6px;
         }
         button[type="submit"] {
-            background: var(--success);
+            background:#4f772d;
             color: white;
             padding: 10px 20px;
             border: none;
@@ -439,23 +428,6 @@ $providers = getAllProviders($conn);
             }
         }
         function editItem(type, data) {
-            // Some buttons embed the item as JSON which may be HTML-escaped by PHP.
-            // If `data` is a string, try to parse it into an object (handle &quot; &amp; entities).
-            if (typeof data === 'string') {
-                try {
-                    data = JSON.parse(data);
-                } catch (e) {
-                    // Try to unescape common HTML entities then parse again
-                    var cleaned = data.replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-                    try {
-                        data = JSON.parse(cleaned);
-                    } catch (e2) {
-                        console.error('Failed to parse item data', e2, data);
-                        return;
-                    }
-                }
-            }
-
             openModal(`edit_${type}_modal`);
             if (type == 'teacher') {
                 document.getElementById('edit_teacher_id').value = data.id;
@@ -463,8 +435,12 @@ $providers = getAllProviders($conn);
                 document.getElementById('edit_teacher_name').value = data.name;
                 document.getElementById('edit_teacher_email').value = data.email || '';
                 document.getElementById('edit_teacher_position').value = data.position || '';
-                document.getElementById('edit_teacher_provider_id').value = data.provider_id || '';
-                document.getElementById('edit_teacher_level').value = data.level || '';
+                if (document.getElementById('edit_teacher_provider_id')) {
+                    document.getElementById('edit_teacher_provider_id').value = data.provider_id ? data.provider_id : '';
+                }
+                if (document.getElementById('edit_teacher_level')) {
+                    document.getElementById('edit_teacher_level').value = data.level ? data.level : '';
+                }
             } else if (type == 'facilitator') {
                 document.getElementById('edit_facilitator_id').value = data.id;
                 document.getElementById('edit_facilitator_id_number').value = data.id_number;
@@ -609,6 +585,7 @@ $providers = getAllProviders($conn);
     <?php endif; ?>
     
     <!-- DASHBOARD SECTION -->
+   <br> <br> <br> <br> <br>
     <div class="section <?= $section == 'dashboard' ? 'active' : '' ?>">
         <div class="grid">
             <div class="card">
@@ -703,44 +680,27 @@ $providers = getAllProviders($conn);
             </form>
         </div>
 
-        <div style="margin:12px 0;">
-            <form method="POST" style="display:inline-block;">
-                <input type="hidden" name="action" value="bulk_generate_passwords">
-                <button type="submit" style="background:#2563eb;color:white;padding:8px;border-radius:6px;border:0;">🔐 Bulk generate missing passwords</button>
-            </form>
-        </div>
+    
 
-        <?php
-            // Group teachers by school/provider
-            $teacherGroups = [];
-            foreach ($teachers as $teacher) {
-                $school = htmlspecialchars($teacher['provider_name'] ?? 'No School Assigned');
-                if (!isset($teacherGroups[$school])) $teacherGroups[$school] = [];
-                $teacherGroups[$school][] = $teacher;
-            }
-
-            foreach ($teacherGroups as $schoolName => $group) :
-        ?>
-        <h3 style="margin-top:18px;">🏫 <?= $schoolName ?> (<?= count($group) ?>)</h3>
         <table>
             <thead>
                 <tr>
                     <th>ID Number</th>
                     <th>Name</th>
                     <th>Position</th>
-                    <th>School</th>
                     <th>Level</th>
+                    <th>School</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($group as $teacher): ?>
+                <?php foreach($teachers as $teacher): ?>
                 <tr>
                     <td><?= htmlspecialchars($teacher['id_number']) ?></td>
                     <td><?= htmlspecialchars($teacher['name']) ?></td>
                     <td><?= htmlspecialchars($teacher['position'] ?? 'N/A') ?></td>
-                    <td><?= htmlspecialchars($teacher['provider_name'] ?? 'No School') ?></td>
                     <td><?= htmlspecialchars($teacher['level'] ?? '—') ?></td>
+                    <td><?= htmlspecialchars($teacher['provider_name'] ?? '—') ?></td>
                     <td class="action-buttons">
                         <button class="btn-edit" onclick="editItem('teacher', <?= htmlspecialchars(json_encode($teacher)) ?>)">✎ Edit</button>
                         <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this teacher?')">
@@ -759,7 +719,6 @@ $providers = getAllProviders($conn);
                 <?php endforeach; ?>
             </tbody>
         </table>
-        <?php endforeach; ?>
     </div>
 
     <!-- Edit Teacher Modal -->
@@ -877,12 +836,6 @@ $providers = getAllProviders($conn);
             </form>
         </div>
 
-        <div style="margin:12px 0;">
-            <form method="POST" style="display:inline-block;">
-                <input type="hidden" name="action" value="bulk_generate_passwords">
-                <button type="submit" style="background:#2563eb;color:white;padding:8px;border-radius:6px;border:0;">🔐 Bulk generate missing passwords</button>
-            </form>
-        </div>
 
         <table>
             <thead>
@@ -972,7 +925,7 @@ $providers = getAllProviders($conn);
 
     <!-- DETAINEES SECTION -->
     <div class="section <?= $section == 'detainees' ? 'active' : '' ?>">
-        <h2>👨‍🎓 Detainee Management</h2>
+        <h2>👨‍🎓 Student Management</h2>
         
         <div class="card">
             <h3>Add New Student</h3>
@@ -1031,12 +984,6 @@ $providers = getAllProviders($conn);
             </form>
         </div>
 
-        <div style="margin:12px 0;">
-            <form method="POST" style="display:inline-block;">
-                <input type="hidden" name="action" value="bulk_generate_passwords">
-                <button type="submit" style="background:#2563eb;color:white;padding:8px;border-radius:6px;border:0;">🔐 Bulk generate missing passwords</button>
-            </form>
-        </div>
 
         <?php
             // Group detainees by school for clearer organization
@@ -1091,7 +1038,7 @@ $providers = getAllProviders($conn);
     <div id="edit_detainee_modal" class="modal">
         <div class="modal-content">
             <span class="modal-close" onclick="closeModal('edit_detainee_modal')">&times;</span>
-            <h2>Edit Detainee</h2>
+            <h2>EditStudent</h2>
             <form method="POST">
                 <input type="hidden" name="action" value="edit_detainee">
                 <input type="hidden" name="detainee_id" id="edit_detainee_id">
@@ -1140,7 +1087,7 @@ $providers = getAllProviders($conn);
                         <input type="password" name="new_password" id="edit_detainee_new_password" placeholder="Leave blank to keep current password">
                     </div>
                 </div>
-                <button type="submit">Update Detainee</button>
+                <button type="submit">Update Student</button>
             </form>
         </div>
     </div>
@@ -1181,8 +1128,7 @@ $providers = getAllProviders($conn);
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Dropbox (Upload file)</label>
-                        <input type="file" name="subject_file" accept=".pdf,.doc,.docx,.zip,.ppt,.pptx">
+                        
                     </div>
                 </div>
                 <button type="submit">Add Subject</button>
@@ -1196,7 +1142,6 @@ $providers = getAllProviders($conn);
                     <th>Title</th>
                     <th>Level</th>
                     <th>Description</th>
-                    <th>File</th>
                     <th>Actions</th>
                 </tr>
             </thead>

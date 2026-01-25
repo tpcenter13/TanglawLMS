@@ -53,7 +53,7 @@ if ($role === 'admin') {
         top: 0; 
         height: 100vh; 
         padding: 20px; 
-        background: linear-gradient(180deg, #1e40af, #1e3a8a); 
+      background: #023047;
         color: #fff; 
         overflow-y: auto; 
         z-index: 200; 
@@ -89,7 +89,7 @@ if ($role === 'admin') {
         transition: all 0.2s;
     }
     .sidebar a:hover { 
-        background: rgba(255, 255, 255, 0.08);
+        background: #fb8500;
     }
     .sidebar a.active { 
         background: rgba(255, 255, 255, 0.15); 

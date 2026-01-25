@@ -227,7 +227,7 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
             margin-bottom: 20px;
         }
         .form-row { 
-            display: grid; 
+            display: center; 
             grid-template-columns: 1fr 1fr; 
             gap: 15px; 
             margin-bottom: 15px; 
@@ -288,6 +288,7 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
     <!-- navigation moved to sidebar -->
 
     <!-- DASHBOARD SECTION -->
+  	<br> <br> <br> <br> <br>
     <div class="section <?= $section == 'dashboard' ? 'active' : '' ?>">
         <div class="grid">
             <div class="card">

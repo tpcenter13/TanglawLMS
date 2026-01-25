@@ -299,6 +299,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
             top: 0;
             left: 0;
             z-index: 300;
+           	height: 50px;
         }
         .teacher-header .container {
             max-width: 1200px;
@@ -434,6 +435,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
     <?php endif; ?>
 
     <!-- DASHBOARD SECTION -->
+   <br> <br> <br> <br> <br>
     <div class="section <?= $section == 'dashboard' ? 'active' : '' ?>">
         <div class="grid">
             <div class="card">
@@ -457,6 +459,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
 
     <!-- UPLOAD MODULES SECTION -->
     <div class="section <?= $section == 'modules' ? 'active' : '' ?>">
+      <br> 
         <h2>📚 Upload Modules</h2>
         
         <div class="card">

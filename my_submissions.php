@@ -1,11 +1,23 @@
 <?php
 include 'conn.php';
 include 'header.php';
+
+session_start();
+
+// FIX: ensure user is logged in
+if (!isset($_SESSION['loggedUser'])) {
+    header("Location: login.php");
+    exit();
+}
+
+$loggedUser = $_SESSION['loggedUser']; // IMPORTANT FIX
+
 echo '<div class="sidebar-backdrop" id="sidebarBackdrop"></div>';
 include 'sidebar.php';
 echo '<div class="main-content">';
 
 $studentId = $loggedUser['id'];
+
 
 // If the submissions table doesn't exist yet, avoid fatal error and show empty result
 $resCheck = $conn->query("SHOW TABLES LIKE 'activity_submissions'");

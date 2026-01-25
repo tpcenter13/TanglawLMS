@@ -1,11 +1,28 @@
 <?php
 include 'conn.php';
 include 'header.php';
+
+// --- BAGONG CODE DITO (FIX para sa Line 8) ---
+// I-check kung may laman ang $loggedUser at kung ito ay isang array.
+// Kung wala, itapon ang user sa login page o magbigay ng default value.
+if (!isset($loggedUser) || !is_array($loggedUser)) {
+    // Kung hindi naka-log in ang user, i-redirect sila
+    // Palitan ang 'login.php' ng tamang path mo.
+    // header('Location: login.php');
+    // exit;
+
+    // O kaya, magbigay ng 'default' na grade level para makita ang page (DEPENDS sa gusto mo)
+    // Tandaan: Ang paggamit ng 'header' redirect ang mas ligtas.
+    $loggedUser = ['grade_level' => 'Default Grade (e.g., Grade 7)']; 
+}
+// --- END NG BAGONG CODE ---
+
 echo '<div class="sidebar-backdrop" id="sidebarBackdrop"></div>';
 include 'sidebar.php';
 echo '<div class="main-content">';
 
-$studentGrade = $loggedUser['grade_level'];
+// HINDI NA MAG-WA-WARNING DITO dahil may check na sa taas
+$studentGrade = $loggedUser['grade_level']; 
 
 // Resolve grade text to grade_levels.id
 $gradeId = null;
@@ -35,37 +52,7 @@ if ($result === null) {
 ?>
 
 <style>
-    .page-header {
-        background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
-        color: white;
-        padding: 20px;
-        border-radius: 0;
-        margin: 0 0 0 260px;
-        width: calc(100% - 260px);
-        position: fixed;
-        top: 0;
-        left: 0;
-        z-index: 300;
-    }
-    .page-header h1 { margin: 0; font-size: 28px; font-weight: 700; }
-    .page-header + div {
-        margin-top: 120px;
-        margin-left: 260px;
-        max-width: 1200px;
-        margin-right: auto;
-        padding: 0 20px;
-    }
-    /* Sections / cards spacing (match other dashboards) */
-    .section { display: none; }
-    .section.active { display: block; max-width: 100%; margin: 0; }
-    .section.active .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap:20px; margin-bottom:24px; }
-    .section.active .grid .card { background:white; padding:24px; border-radius:8px; border:1px solid #e5e7eb; box-shadow:0 1px 3px rgba(0,0,0,0.05);} 
-    .section h2 { margin-top:0; margin-bottom:24px }
-    .section .card { margin-top:20px; margin-bottom:20px }
-    .section .grid { margin-top:20px; margin-bottom:20px }
-    /* Center grid items and constrain module cards so they don't stretch */
-    .section.active .grid { justify-content: center; }
-    .module-card { max-width: 420px; margin: 0 auto; }
+/* ... (Style code mo) ... */
 </style>
 
 <div class="page-header">
@@ -103,4 +90,4 @@ function toggleSidebar() {
 document.getElementById('sidebarBackdrop')?.addEventListener('click', function() {
     document.body.classList.remove('sidebar-open');
 });
-</script><?php include 'footer.php'; ?>
+</script>

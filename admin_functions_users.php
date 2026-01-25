@@ -205,18 +205,10 @@ function addTeacher($conn, $id_number, $name, $email, $position, $provider_id = 
     $hashedPassword = password_hash($plainPassword, PASSWORD_DEFAULT);
 
     // Build insert dynamically depending on columns available
-    // Treat empty email as NULL (do not insert empty string) to avoid unique '' collisions
-    $cols = ['id_number','name','position','password'];
-    $placeholders = ['?','?','?','?'];
-    $types = 'ssss';
-    $values = [$id_number, $name, $position, $hashedPassword];
-    if (!empty($email)) {
-        // insert email only when provided
-        array_splice($cols, 2, 0, 'email');
-        array_splice($placeholders, 2, 0, '?');
-        $types = substr_replace($types, 's', 2, 0); // insert 's' at position 2
-        array_splice($values, 2, 0, [$email]);
-    }
+    $cols = ['id_number','name','email','position','password'];
+    $placeholders = ['?','?','?','?','?'];
+    $types = 'sssss';
+    $values = [$id_number, $name, $email, $position, $hashedPassword];
 
     if (hasColumn($conn, 'teachers', 'provider_id') && $provider_id !== null) {
         $cols[] = 'provider_id';
@@ -296,19 +288,9 @@ function editTeacher($conn, $teacher_id, $id_number, $name, $email, $position, $
     }
 
     // Build update dynamically
-    $sets = ['id_number = ?', 'name = ?', 'position = ?'];
-    $types = 'sss';
-    $values = [$id_number, $name, $position];
-
-    // If email provided, update it via parameter; if empty, set to NULL explicitly
-    if (!empty($email)) {
-        $sets[] = 'email = ?';
-        $types .= 's';
-        $values[] = $email;
-    } else {
-        // set to NULL in DB (no bound param) to avoid inserting empty string into a UNIQUE column
-        $sets[] = 'email = NULL';
-    }
+    $sets = ['id_number = ?', 'name = ?', 'email = ?', 'position = ?'];
+    $types = 'ssss';
+    $values = [$id_number, $name, $email, $position];
 
     // Always update provider_id if column exists (including setting to NULL/0 for empty values)
     if (hasColumn($conn, 'teachers', 'provider_id')) {

@@ -1,14 +1,22 @@
 <?php
 include 'conn.php';
 include 'header.php';
+
+session_start();
+
+// FIX: Ensure logged user exists
+if (!isset($_SESSION['loggedUser'])) {
+    header("Location: login.php");
+    exit();
+}
+
+$loggedUser = $_SESSION['loggedUser']; // IMPORTANT FIX
+
 echo '<div class="sidebar-backdrop" id="sidebarBackdrop"></div>';
 include 'sidebar.php';
 echo '<div class="main-content">';
 
-if (!isset($_SESSION)) {
-    session_start();
-}
-
+// Now safe to use $loggedUser
 $studentId = $loggedUser['id'];
 
 // Accept module_id as GET parameter
@@ -204,6 +212,6 @@ function toggleSidebar() {
 document.getElementById('sidebarBackdrop')?.addEventListener('click', function() {
     document.body.classList.remove('sidebar-open');
 });
-</script><p style="margin-top:12px;"><a href="student_modules.php">← Back to Modules</a></p>
+</script><p style="margin-top:12px;"><a href="">← Back to Modules</a></p>
 
 <?php include 'footer.php'; ?>

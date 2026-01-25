@@ -1,17 +1,6 @@
 <?php
 session_start();
-$host = "localhost";        
-$user = "root";           
-$password = "";            
-$database = "tanglaw_lms";
-
-$conn = new mysqli($host, $user, $password, $database);
-
-if ($conn->connect_error) {
-    die("❌ Connection failed: " . $conn->connect_error);
-}
-
-$conn->set_charset("utf8");
+include("conn.php");
 
 $error = "";
 $success = "";
@@ -31,14 +20,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             } else {
                 $adminEmail = 'no-reply@localhost';
             }
-            $subject = "Tanglaw LMS - Password Assistance Request";
+            $subject = "Tanglaw Learn - Password Assistance Request";
             $body = "A user has requested password assistance.<br><br>";
             $body .= "Email: " . htmlspecialchars($forgot_email) . "<br>";
             $body .= "Role: " . htmlspecialchars($forgot_role) . "<br>";
             $body .= "Please contact the user with their account details.<br>";
             $headers  = "MIME-Version: 1.0" . "\r\n";
             $headers .= "Content-type: text/html; charset=UTF-8" . "\r\n";
-            $headers .= "From: Tanglaw LMS <" . $adminEmail . ">" . "\r\n";
+            $headers .= "From: Tanglaw Learn <" . $adminEmail . ">" . "\r\n";
             @mail($adminEmail, $subject, $body, $headers);
             $success = '✅ Your request has been sent to the administrator. They will contact you via email.';
         }
@@ -207,6 +196,8 @@ $conn->close();
     <title>Login - Tanglaw LMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
+      
+      
         body {
             margin: 0;
             padding: 0;
@@ -310,7 +301,7 @@ $conn->close();
         .login-btn {
             width: 100%;
             padding: 10px;
-            background: var(--accent);
+            background: #003049;
             color: white;
             border: none;
             border-radius: 6px;
@@ -364,28 +355,39 @@ $conn->close();
     </style>
 </head>
 <body>
+  
+  <script>
+function togglePassword() {
+    const input = document.getElementById('password');
+    if (input.type === 'password') {
+        input.type = 'text';
+    } else {
+        input.type = 'password';
+    }
+}
+</script>
+  
 <div class="login-wrapper">
-    <!-- LEFT COLUMN: CLIENT LOGOS SPACE -->
     <div class="login-right">
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 40px;">
             <h2 style="color: white; font-size: 32px; margin: 0; text-align: center; font-weight: 700;">TANGLAW LEARN</h2>
             <div class="logo-space">
                 <div class="logo-placeholder">
                     <div>
-                        <img src="" alt="Logo 1" style="display:none;">
-                        <span>Logo 1</span>
+                        <img src="Bulacan_Seal.png" alt="Logo 1 - Official Seal of the Province of Bulacan">
+                        <span>Province of Bulacan Seal</span>
                     </div>
                 </div>
                 <div class="logo-placeholder">
                     <div>
-                        <img src="" alt="Logo 2" style="display:none;">
-                        <span>Logo 2</span>
+                        <img src="tangllaw_logo.png" alt="Logo 2 - Tanglaw ng Masa Youth Rehabilitation Center">
+                        <span>Tanglaw ng Masa Youth Rehabilitation Center</span>
                     </div>
                 </div>
                 <div class="logo-placeholder">
                     <div>
-                        <img src="" alt="Logo 3" style="display:none;">
-                        <span>Logo 3</span>
+                        <img src="marcello_logo.png" alt="Logo 3 - Pambansang Mataas na Paaralang Marcelo H. Del Pilar">
+                        <span>Pambansang Mataas na Paaralang Marcelo H. Del Pilar</span>
                     </div>
                 </div>
                 <div class="logo-placeholder">
@@ -411,29 +413,83 @@ $conn->close();
                     <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
                 <?php endif; ?>
                 
-                <h1>🎓 Tanglaw LMS</h1>
+                <h1>🎓 Tanglaw Learn</h1>
                 
                 <form method="POST" style="display: flex; flex-direction: column; gap: 16px;">
                     <div class="form-group">
                         <label for="role">Login as</label>
                         <select id="role" name="role" required onchange="updateInfo()">
                             <option value="">Select User Type</option>
-                            <option value="admin">🛡️ Admin</option>
-                            <option value="teacher">👨‍🏫 Teacher</option>
-                            <option value="facilitator">👥 Facilitator</option>
-                            <option value="detainee">👨‍🎓 Detainee</option>
+                            <option value="admin"> Admin</option>
+                            <option value="teacher"> Teacher</option>
+                            <option value="facilitator"> Facilitator</option>
+                            <option value="detainee"> Student</option>
                         </select>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="username">ID Number or Username</label>
-                        <input type="text" id="username" name="username" placeholder="Enter your ID number" required>
-                    </div>
-                    
-                    <div class="form-group" id="password-group" style="display: none; flex-direction: column;">
-                        <label for="password">Password <span style="color: #ef4444;">*</span></label>
-                        <input type="password" id="password" name="password" placeholder="Enter your password">
-                    </div>
+<div class="form-group">
+    <label for="username">ID Number or Username</label>
+    <input type="text" id="username" name="username" placeholder="Enter your ID number" required>
+</div>
+
+<div class="form-group" id="password-group" style="flex-direction: column; position: relative;">
+    <label for="password">Password <span style="color: #ef4444;">*</span></label>
+
+    <input type="password" id="password" name="password" placeholder="Enter your password"
+        style="padding-right: 40px;">
+
+    <!-- Eye Icon (SVG, Clean & Modern) -->
+    <span onclick="togglePassword()" 
+          style="position:absolute; right:15px; top:30px; cursor:pointer; user-select:none; width:22px;">
+        <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+            <circle cx="12" cy="12" r="3"/>
+        </svg>
+    </span>
+</div>
+
+<script>
+function togglePassword() {
+    const pwd = document.getElementById("password");
+    const icon = document.getElementById("eyeIcon");
+
+    if (pwd.type === "password") {
+        pwd.type = "text";
+        icon.innerHTML = `
+            <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7
+                     a21.8 21.8 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 5
+                     c7 0 11 7 11 7a21.8 21.8 0 0 1-5.06 5.94M15 12
+                     a3 3 0 1 1-3-3"></path>
+            <line x1="1" y1="1" x2="23" y2="23"></line>
+        `;
+    } else {
+        pwd.type = "password";
+        icon.innerHTML = `
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+            <circle cx="12" cy="12" r="3"/>
+        `;
+    }
+}
+</script>
+
+
+<script>
+function togglePassword() {
+    const pwd = document.getElementById("password");
+    pwd.type = pwd.type === "password" ? "text" : "password";
+}
+</script>
+
+
+<script>
+function togglePassword() {
+    const pwd = document.getElementById("password");
+    pwd.type = pwd.type === "password" ? "text" : "password";
+}
+</script>
+
+
+
                     
                     <!-- role-help removed per request -->
                     
@@ -475,7 +531,7 @@ function updateInfo() {
                 <select name="forgot_role" required>
                     <option value="teacher">Teacher</option>
                     <option value="facilitator">Facilitator</option>
-                    <option value="detainee">Detainee</option>
+                    <option value="detainee">Student</option>
                 </select>
             </div>
             <div style="margin-bottom:8px;"><label>Email</label><br>
@@ -503,3 +559,5 @@ function submitForgot(form){
 </body>
 </html>
 
+
+ito full code
