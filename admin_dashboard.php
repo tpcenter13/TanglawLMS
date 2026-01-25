@@ -41,29 +41,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
     
-    if ($action == 'add_teacher') {
-        // Form requires: id_number, name. Position/email/provider are optional.
-        if (empty($_POST['id_number']) || empty($_POST['name'])) {
-            $message = 'Please fill in all fields.';
-        } else {
-            // Do not accept file on Add Teacher (per request). Pass null for profile_file.
-            $result = addTeacher(
-                $conn,
-                $_POST['id_number'],
-                $_POST['name'],
-                $_POST['email'] ?? '',
-                $_POST['position'] ?? '',
-              	$_POST['level'] ?? '',
-                $_POST['school'] ?? '',
-                !empty($_POST['provider_id']) ? (int)$_POST['provider_id'] : null,
-                $_POST['level'] ?? null,
-                null,
-                !empty($_POST['password']) ? $_POST['password'] : null
-            );
-            $message = $result['message'];
-            $section = 'teachers';
-        }
+   if ($action == 'add_teacher') {
+    // Form requires: id_number, name. Position/email/provider are optional.
+    if (empty($_POST['id_number']) || empty($_POST['name'])) {
+        $message = 'Please fill in all fields.';
+    } else {
+        $result = addTeacher(
+            $conn,
+            $_POST['id_number'],
+            $_POST['name'],
+            $_POST['email'] ?? '',
+            $_POST['position'] ?? '',
+            !empty($_POST['provider_id']) ? (int)$_POST['provider_id'] : null,  // provider_id
+            $_POST['level'] ?? null,                                             // level
+            null,                                                                 // profile_file
+            !empty($_POST['password']) ? $_POST['password'] : null               // adminPassword
+        );
+        $message = $result['message'];
+        $section = 'teachers';
     }
+}
     
     if ($action == 'archive_teacher') {
         if (empty($_POST['teacher_id'])) {

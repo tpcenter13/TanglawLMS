@@ -195,6 +195,17 @@ function addTeacher($conn, $id_number, $name, $email, $position, $provider_id = 
         $checkStmt->close();
     }
 
+    // Validate provider_id if provided
+    if (!empty($provider_id) && hasColumn($conn, 'teachers', 'provider_id')) {
+        $checkStmt = $conn->prepare("SELECT id FROM providers WHERE id = ?");
+        $checkStmt->bind_param("i", $provider_id);
+        $checkStmt->execute();
+        if ($checkStmt->get_result()->num_rows === 0) {
+            return ['success' => false, 'message' => '❌ Invalid provider selected. Provider does not exist.'];
+        }
+        $checkStmt->close();
+    }
+
     // Ensure password column exists and set password for the new account
     ensurePasswordColumn($conn, 'teachers');
     if (!empty($adminPassword)) {
@@ -210,12 +221,14 @@ function addTeacher($conn, $id_number, $name, $email, $position, $provider_id = 
     $types = 'sssss';
     $values = [$id_number, $name, $email, $position, $hashedPassword];
 
-    if (hasColumn($conn, 'teachers', 'provider_id') && $provider_id !== null) {
+    // Only add provider_id if column exists AND a valid ID was provided
+    if (hasColumn($conn, 'teachers', 'provider_id') && !empty($provider_id)) {
         $cols[] = 'provider_id';
         $placeholders[] = '?';
         $types .= 'i';
         $values[] = (int)$provider_id;
     }
+    
     if (hasColumn($conn, 'teachers', 'level') && $level !== null) {
         $cols[] = 'level';
         $placeholders[] = '?';
@@ -250,7 +263,7 @@ function addTeacher($conn, $id_number, $name, $email, $position, $provider_id = 
         return ['success' => true, 'message' => '✅ Teacher added successfully'];
     } else {
         if ($stmt) { $stmt->close(); }
-        return ['success' => false, 'message' => '❌ Error adding teacher'];
+        return ['success' => false, 'message' => '❌ Error adding teacher: ' . $conn->error];
     }
 }
 
