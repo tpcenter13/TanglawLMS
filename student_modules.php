@@ -1,41 +1,33 @@
 <?php
+session_start();
 include 'conn.php';
 include 'header.php';
 
-// --- BAGONG CODE DITO (FIX para sa Line 8) ---
-// I-check kung may laman ang $loggedUser at kung ito ay isang array.
-// Kung wala, itapon ang user sa login page o magbigay ng default value.
-if (!isset($loggedUser) || !is_array($loggedUser)) {
-    // Kung hindi naka-log in ang user, i-redirect sila
-    // Palitan ang 'login.php' ng tamang path mo.
-    // header('Location: login.php');
-    // exit;
-
-    // O kaya, magbigay ng 'default' na grade level para makita ang page (DEPENDS sa gusto mo)
-    // Tandaan: Ang paggamit ng 'header' redirect ang mas ligtas.
-    $loggedUser = ['grade_level' => 'Default Grade (e.g., Grade 7)']; 
+// ✅ Ensure user is logged in
+if (!isset($_SESSION['loggedUser']) || !is_array($_SESSION['loggedUser'])) {
+    header("Location: login.php");
+    exit();
 }
-// --- END NG BAGONG CODE ---
 
-echo '<div class="sidebar-backdrop" id="sidebarBackdrop"></div>';
+$loggedUser = $_SESSION['loggedUser'];
+$studentGrade = $loggedUser['grade_level'];
+
 include 'sidebar.php';
-echo '<div class="main-content">';
 
-// HINDI NA MAG-WA-WARNING DITO dahil may check na sa taas
-$studentGrade = $loggedUser['grade_level']; 
-
-// Resolve grade text to grade_levels.id
+// Resolve grade text → grade_levels.id
 $gradeId = null;
 $gstmt = $conn->prepare("SELECT id FROM grade_levels WHERE level = ? LIMIT 1");
 if ($gstmt) {
     $gstmt->bind_param("s", $studentGrade);
     $gstmt->execute();
     $gres = $gstmt->get_result();
-    if ($gres && $gr = $gres->fetch_assoc()) { $gradeId = (int)$gr['id']; }
+    if ($gres && $gr = $gres->fetch_assoc()) {
+        $gradeId = (int)$gr['id'];
+    }
     $gstmt->close();
 }
 
-// Get modules for this student's grade level using prepared statement (by id)
+// Get modules
 $result = null;
 if ($gradeId !== null) {
     $stmt = $conn->prepare("SELECT id, title, file_path FROM modules WHERE grade_level_id = ?");
@@ -45,49 +37,254 @@ if ($gradeId !== null) {
         $result = $stmt->get_result();
     }
 }
+
 if ($result === null) {
-    // empty result-like object
-    $result = new class { public $num_rows = 0; public function fetch_assoc(){return false;} };
+    $result = new class {
+        public $num_rows = 0;
+        public function fetch_assoc(){ return false; }
+    };
 }
+
+echo '<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>';
 ?>
 
 <style>
-/* ... (Style code mo) ... */
+/* ===== GLOBAL ===== */
+body {
+    background: #f3f4f6;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+}
+
+/* ===== FIXED HEADER (RESPECTS SIDEBAR) ===== */
+.student-header {
+    position: fixed;
+    top: 0;
+    left: 260px;
+    width: calc(100% - 260px);
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+    color: white;
+    padding: 18px 32px;
+    z-index: 150;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.student-header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.student-header h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 800;
+}
+
+.student-header a {
+    color: white;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.student-header a:hover {
+    text-decoration: underline;
+}
+
+/* ===== MAIN CONTAINER ===== */
+.main-container {
+    padding: 120px 32px 64px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* ===== SECTION TITLES ===== */
+.section-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 20px;
+    color: #1f2937;
+    border-bottom: 3px solid #f59e0b;
+    padding-bottom: 8px;
+}
+
+/* ===== ACTION BUTTONS ===== */
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    display: inline-block;
+    padding: 10px 18px;
+    background: #f59e0b;
+    color: white;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.btn:hover {
+    background: #d97706;
+}
+
+.btn.secondary {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.btn.secondary:hover {
+    background: #bfdbfe;
+}
+
+/* ===== MODULE GRID ===== */
+.modules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.module-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.module-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,.12);
+}
+
+.module-card strong {
+    display: block;
+    color: #1f2937;
+    font-size: 16px;
+    margin-bottom: 16px;
+    line-height: 1.4;
+}
+
+.module-card a {
+    display: inline-block;
+    margin: 8px 8px 0 0;
+    padding: 8px 14px;
+    background: #dbeafe;
+    color: #1e40af;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.module-card a:hover {
+    background: #bfdbfe;
+}
+
+.module-card a.btn {
+    background: #f59e0b;
+    color: white;
+    margin-top: 12px;
+}
+
+.module-card a.btn:hover {
+    background: #d97706;
+}
+
+.empty-state {
+    background: #fff;
+    border-radius: 14px;
+    padding: 48px 24px;
+    border: 1px solid #e5e7eb;
+    text-align: center;
+    color: #6b7280;
+}
+
+/* ===== RESPONSIVE FIX ===== */
+@media (max-width: 900px) {
+    .student-header {
+        left: 0;
+        width: 100%;
+    }
+    .main-container {
+        padding: 110px 16px 48px;
+    }
+    .modules-grid {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 
-<div class="page-header">
-    <h1>📘 My Modules</h1>
+<!-- ===== HEADER ===== -->
+<div class="student-header">
+    <div class="student-header-content">
+        <h1>🎓 Tanglaw Learn</h1>
+        <div>
+            Welcome, <?= htmlspecialchars($loggedUser['name']) ?> |
+            <a href="logout.php">Logout</a>
+        </div>
+    </div>
 </div>
 
-<div class="container" style="margin-top: 100px;">
-    <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
-        <a class="btn" href="student_dashboard.php">🧭 Go to Dashboard</a>
+<!-- ===== MAIN CONTENT ===== -->
+<div class="main-container">
+
+    <h2 class="section-title">📘 My Modules</h2>
+
+    <div class="action-buttons">
+        <a class="btn secondary" href="student_dashboard.php">🧭 Go to Dashboard</a>
         <a class="btn secondary" href="my_submissions.php">📥 View my Activity Submissions</a>
     </div>
 
     <?php if ($result->num_rows > 0): ?>
-        <div class="grid">
-        <?php while($row = $result->fetch_assoc()): ?>
-            <div class="module-card card">
-                <strong><?= htmlspecialchars($row['title']); ?></strong><br>
-                <a href="<?= htmlspecialchars($row['file_path']); ?>" target="_blank">📖 Read Module</a>
-                <br>
-                <a class="btn" href="submit_activity.php?module_id=<?= $row['id'] ?>">📨 Submit Activity Sheet</a>
-            </div>
-        <?php endwhile; ?>
+        <div class="modules-grid">
+            <?php while($row = $result->fetch_assoc()): ?>
+                <div class="module-card">
+                    <strong><?= htmlspecialchars($row['title']); ?></strong>
+                    <div>
+                        <a href="<?= htmlspecialchars($row['file_path']); ?>" target="_blank">📖 Read Module</a>
+                        <a class="btn" href="submit_activity.php?module_id=<?= $row['id'] ?>">📨 Submit Activity</a>
+                    </div>
+                </div>
+            <?php endwhile; ?>
         </div>
     <?php else: ?>
-        <p>No modules available for your grade level.</p>
+        <div class="empty-state">
+            <p>No modules available for your grade level yet.</p>
+        </div>
     <?php endif; ?>
+
 </div>
 
-<?php include 'footer.php'; ?>
-</div>
 <script>
 function toggleSidebar() {
-    document.body.classList.toggle('sidebar-open');
+    const body = document.body;
+    const backdrop = document.getElementById('sidebarBackdrop');
+
+    if (window.innerWidth <= 900) {
+        body.classList.toggle('sidebar-open');
+    } else {
+        body.classList.toggle('sidebar-collapsed');
+    }
+
+    if (backdrop) {
+        backdrop.style.display = body.classList.contains('sidebar-open') ? 'block' : 'none';
+    }
 }
-document.getElementById('sidebarBackdrop')?.addEventListener('click', function() {
+
+document.addEventListener('DOMContentLoaded', function() {
     document.body.classList.remove('sidebar-open');
+    document.body.classList.remove('sidebar-collapsed');
 });
 </script>
+
+<?php include 'footer.php'; ?>

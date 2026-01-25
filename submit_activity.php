@@ -12,9 +12,8 @@ if (!isset($_SESSION['loggedUser'])) {
 
 $loggedUser = $_SESSION['loggedUser']; // IMPORTANT FIX
 
-echo '<div class="sidebar-backdrop" id="sidebarBackdrop"></div>';
+echo '<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>';
 include 'sidebar.php';
-echo '<div class="main-content">';
 
 // Now safe to use $loggedUser
 $studentId = $loggedUser['id'];
@@ -131,87 +130,247 @@ if ($gradeId !== null) {
 ?>
 
 <style>
-    .page-header {
-        background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 100%);
-        color: white;
-        padding: 20px;
-        border-radius: 0;
-        margin: 0 0 0 260px;
-        width: calc(100% - 260px);
-        position: fixed;
-        top: 0;
+/* ===== GLOBAL ===== */
+body {
+    background: #f3f4f6;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+}
+
+/* ===== FIXED HEADER (RESPECTS SIDEBAR) ===== */
+.student-header {
+    position: fixed;
+    top: 0;
+    left: 260px;
+    width: calc(100% - 260px);
+    background: linear-gradient(135deg, #f59e0b, #f97316);
+    color: white;
+    padding: 18px 32px;
+    z-index: 150;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.student-header-content {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.student-header h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 800;
+}
+
+/* ===== MAIN CONTAINER ===== */
+.main-container {
+    padding: 120px 32px 64px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* ===== SECTION TITLES ===== */
+.section-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 20px;
+    color: #1f2937;
+    border-bottom: 3px solid #f59e0b;
+    padding-bottom: 8px;
+}
+
+/* ===== ALERT CARDS ===== */
+.alert-success {
+    background: #ecfdf5;
+    border: 1px solid #bbf7d0;
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    color: #166534;
+    font-weight: 600;
+}
+
+.alert-error {
+    background: #fff1f2;
+    border: 1px solid #fecaca;
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    color: #991b1b;
+}
+
+.alert-error div {
+    margin-bottom: 8px;
+}
+
+.alert-error div:last-child {
+    margin-bottom: 0;
+}
+
+/* ===== FORM CARD ===== */
+.form-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 28px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    margin-bottom: 24px;
+}
+
+.form-card label {
+    display: block;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.form-card select,
+.form-card input[type="file"],
+.form-card textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    margin-bottom: 20px;
+    transition: border-color 0.2s;
+}
+
+.form-card select:focus,
+.form-card textarea:focus {
+    outline: none;
+    border-color: #f59e0b;
+}
+
+.form-card input[type="file"] {
+    padding: 8px;
+}
+
+.form-card textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+
+.btn-submit {
+    display: inline-block;
+    padding: 12px 24px;
+    background: #f59e0b;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-submit:hover {
+    background: #d97706;
+}
+
+.back-link {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 10px 18px;
+    background: #dbeafe;
+    color: #1e40af;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.back-link:hover {
+    background: #bfdbfe;
+}
+
+/* ===== RESPONSIVE FIX ===== */
+@media (max-width: 900px) {
+    .student-header {
         left: 0;
-        z-index: 300;
+        width: 100%;
     }
-    .page-header h1 { margin: 0; font-size: 28px; font-weight: 700; }
-    .page-header + .container {
-        margin-top: 120px;
-        margin-left: 260px;
-        max-width: 1200px;
-        margin-right: auto;
-        padding: 0 20px;
+    .main-container {
+        padding: 110px 16px 48px;
     }
-    /* Sections / cards spacing (match other dashboards) */
-    .section { display: none; }
-    .section.active { display: block; max-width: 100%; margin: 0; }
-    .section.active .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap:20px; margin-bottom:24px; }
-    .section.active .grid .card { background:white; padding:24px; border-radius:8px; border:1px solid #e5e7eb; box-shadow:0 1px 3px rgba(0,0,0,0.05);} 
-    .section h2 { margin-top:0; margin-bottom:24px }
-    .section .card { margin-top:120px; margin-bottom:20px }
-    .section .grid { margin-top:120px; margin-bottom:20px }
+}
 </style>
 
-<div class="page-header">
-    <h1>📄 Submit Activity Sheet</h1>
+<!-- ===== HEADER ===== -->
+<div class="student-header">
+    <div class="student-header-content">
+        <h1>📄 Submit Activity Sheet</h1>
+    </div>
 </div>
 
-<div class="container" style="margin-top: 100px;">
+<div class="main-container">
+    
+    <h2 class="section-title">📝 Upload Your Work</h2>
+
     <?php if ($success): ?>
-        <div class="card" style="background:#ecfdf5; border-color:#bbf7d0;">
-            <?php echo htmlspecialchars($success); ?>
+        <div class="alert-success">
+            ✅ <?php echo htmlspecialchars($success); ?>
         </div>
     <?php endif; ?>
 
     <?php if (!empty($errors)): ?>
-        <div class="card" style="background:#fff1f2; border-color:#fecaca;">
+        <div class="alert-error">
             <?php foreach ($errors as $e): ?>
-                <div>- <?php echo htmlspecialchars($e); ?></div>
+                <div>❌ <?php echo htmlspecialchars($e); ?></div>
             <?php endforeach; ?>
         </div>
     <?php endif; ?>
 
-    <form method="POST" enctype="multipart/form-data" style="margin-top:15px;" class="card">
-        <label>Module:</label><br>
-        <select name="module_id" required style="width:90%; padding:6px;">
-            <option value="">-- choose a module --</option>
+    <form method="POST" enctype="multipart/form-data" class="form-card">
+        
+        <label for="module_id">Select Module</label>
+        <select name="module_id" id="module_id" required>
+            <option value="">-- Choose a module --</option>
             <?php foreach ($modules as $m): ?>
-                <option value="<?php echo $m['id']; ?>" <?php echo ($m['id'] == $moduleId) ? 'selected' : ''; ?>><?php echo htmlspecialchars($m['title']); ?></option>
+                <option value="<?php echo $m['id']; ?>" <?php echo ($m['id'] == $moduleId) ? 'selected' : ''; ?>>
+                    <?php echo htmlspecialchars($m['title']); ?>
+                </option>
             <?php endforeach; ?>
         </select>
-        <br><br>
 
-        <label>Attach Activity Sheet (PDF, DOC, DOCX, JPG, PNG):</label><br>
-        <input type="file" name="activity_sheet" accept=".pdf, .doc, .docx, .jpg, .jpeg, .png" required>
-        <br><br>
+        <label for="activity_sheet">Attach Activity Sheet (PDF, DOC, DOCX, JPG, PNG)</label>
+        <input type="file" name="activity_sheet" id="activity_sheet" accept=".pdf, .doc, .docx, .jpg, .jpeg, .png" required>
 
-        <label>Comments (optional):</label><br>
-        <textarea name="comments" rows="5" style="width:90%;"></textarea>
-        <br><br>
+        <label for="comments">Comments (optional)</label>
+        <textarea name="comments" id="comments" placeholder="Add any notes or comments about your submission..."></textarea>
 
-        <button type="submit" class="btn">Submit to Tanglaw Facilitator</button>
+        <button type="submit" class="btn-submit">📤 Submit to Tanglaw Facilitator</button>
     </form>
 
-    <hr>
+    <a href="student_modules.php" class="back-link">← Back to Modules</a>
 
-<?php include 'footer.php'; ?>
 </div>
+
 <script>
 function toggleSidebar() {
-    document.body.classList.toggle('sidebar-open');
+    const body = document.body;
+    const backdrop = document.getElementById('sidebarBackdrop');
+
+    if (window.innerWidth <= 900) {
+        body.classList.toggle('sidebar-open');
+    } else {
+        body.classList.toggle('sidebar-collapsed');
+    }
+
+    if (backdrop) {
+        backdrop.style.display = body.classList.contains('sidebar-open') ? 'block' : 'none';
+    }
 }
-document.getElementById('sidebarBackdrop')?.addEventListener('click', function() {
+
+document.addEventListener('DOMContentLoaded', function() {
     document.body.classList.remove('sidebar-open');
+    document.body.classList.remove('sidebar-collapsed');
 });
-</script><p style="margin-top:12px;"><a href="">← Back to Modules</a></p>
+</script>
 
 <?php include 'footer.php'; ?>
