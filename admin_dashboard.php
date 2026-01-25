@@ -485,32 +485,54 @@ $providers = getAllProviders($conn);
         allGrades.push(<?= json_encode($gl['level']) ?>);
         <?php endforeach; ?>
 
-        function setDetaineeGradeOptions(school, selectEl) {
-            if (!selectEl) return;
-            var val = (school || '').toString().toLowerCase();
-            var allowed = [];
-            if (val.indexOf('marcelo') !== -1 || val.indexOf('st') !== -1 || val.indexOf('st. martin') !== -1 || val.indexOf('st martin') !== -1) {
-                // Marcelo and St. Martin -> Grade 11 and 12 only
-                allowed = allGrades.filter(function(g){ return g.indexOf('11') !== -1 || g.indexOf('12') !== -1 || g.toLowerCase().indexOf('grade 11') !== -1 || g.toLowerCase().indexOf('grade 12') !== -1; });
-            } else if (val.indexOf('als') !== -1) {
-                // ALS -> Grade 7 to 10
-                allowed = allGrades.filter(function(g){ return g.indexOf('7') !== -1 || g.indexOf('8') !== -1 || g.indexOf('9') !== -1 || g.indexOf('10') !== -1 || g.toLowerCase().indexOf('grade 7') !== -1 || g.toLowerCase().indexOf('grade 8') !== -1 || g.toLowerCase().indexOf('grade 9') !== -1 || g.toLowerCase().indexOf('grade 10') !== -1; });
-            } else {
-                allowed = allGrades.slice();
-            }
-            // rebuild options
-            selectEl.innerHTML = '';
-            var placeholder = document.createElement('option');
-            placeholder.value = '';
-            placeholder.textContent = 'Select Grade Level';
-            selectEl.appendChild(placeholder);
-            allowed.forEach(function(g){
-                var opt = document.createElement('option');
-                opt.value = g;
-                opt.textContent = g;
-                selectEl.appendChild(opt);
-            });
-        }
+       function setDetaineeGradeOptions(school, selectEl) {
+    if (!selectEl) return;
+
+    var val = (school || '').trim().toLowerCase();
+    var allowed = [];
+
+    if (val.includes('marcelo') || val.includes('st') || val.includes('st. martin') || val.includes('st martin')) {
+        // Senior High only
+        allowed = allGrades.filter(g => 
+            ['Grade 11', 'Grade 12', 'grade 11', 'grade 12']
+                .some(pattern => g.toLowerCase() === pattern)
+        );
+    } 
+    else if (val.includes('als')) {
+        // Junior High / ALS → Grades 7–10 only
+        allowed = allGrades.filter(g => 
+            ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 
+             'grade 7', 'grade 8', 'grade 9', 'grade 10']
+                .some(pattern => g.toLowerCase() === pattern)
+        );
+    } 
+    else {
+        // Other / Community → show everything
+        allowed = allGrades.slice();
+    }
+
+    // Rebuild dropdown
+    selectEl.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Select Grade Level';
+    selectEl.appendChild(placeholder);
+
+    // Sort numerically if you want clean order (7 → 8 → 9 → 10 → 11 → 12)
+    allowed.sort((a, b) => {
+        const numA = parseInt(a.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.replace(/\D/g, '')) || 0;
+        return numA - numB;
+    });
+
+    allowed.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g;
+        opt.textContent = g;
+        selectEl.appendChild(opt);
+    });
+}
 
         // Wire up add form school change
         document.addEventListener('DOMContentLoaded', function(){
@@ -522,20 +544,7 @@ $providers = getAllProviders($conn);
                 setDetaineeGradeOptions(addSchool.value, addGrade);
             }
         });
-        // Toggle a password row and autofocus the input when shown
-        function togglePasswordRow(toggleId, rowId, inputId) {
-            var cb = document.getElementById(toggleId);
-            var row = document.getElementById(rowId);
-            if (!cb || !row) return;
-            row.style.display = cb.checked ? 'none' : 'block';
-            if (!cb.checked) {
-                // small delay to ensure element is visible before focus
-                setTimeout(function(){
-                    var inp = document.getElementById(inputId);
-                    if (inp) inp.focus();
-                }, 50);
-            }
-        }
+       
     </script>
     <script>
         function toggleSidebar() {
@@ -663,16 +672,12 @@ $providers = getAllProviders($conn);
                         </select>
                     </div>
                 </div>
-                <div class="form-row full">
-                    <div class="form-group">
-                        <label style="font-weight:600">Auto-generate password</label>
-                        <input type="checkbox" id="teacher_password_toggle" name="auto_password_teacher" checked onclick="togglePasswordRow('teacher_password_toggle','teacher_password_row','teacher_password_input')">
-                    </div>
-                    <div class="form-group" id="teacher_password_row" style="display:none;">
-                        <label>Password</label>
-                        <input type="password" id="teacher_password_input" name="password" placeholder="Enter password to override auto-generation">
-                    </div>
-                </div>
+<div class="form-row full">
+    <div class="form-group">
+        <label>Password </label>
+        <input type="password" name="password" placeholder="Enter password ">
+    </div>
+</div>
                 <button type="submit">Add Teacher</button>
             </form>
         </div>
@@ -819,16 +824,13 @@ $providers = getAllProviders($conn);
                         </select>
                     </div>
                 </div>
-                <div class="form-row full" style="margin-top:8px;">
-                    <div class="form-group">
-                        <label style="font-weight:600">Auto-generate password</label>
-                        <input type="checkbox" id="fac_password_toggle" name="auto_password_fac" checked onclick="togglePasswordRow('fac_password_toggle','fac_password_row','fac_password_input')">
-                    </div>
-                    <div class="form-group" id="fac_password_row" style="display:none;">
-                        <label>Password</label>
-                        <input type="password" id="fac_password_input" name="password" placeholder="Enter password to override auto-generation">
-                    </div>
-                </div>
+
+<div class="form-row full">
+    <div class="form-group">
+        <label>Password </label>
+        <input type="password" name="password" placeholder="Enter password ">
+    </div>
+</div>
                 <button type="submit">Add Facilitator</button>
             </form>
         </div>
@@ -967,16 +969,13 @@ $providers = getAllProviders($conn);
                         </select>
                     </div>
                 </div>
-                <div class="form-row full">
-                    <div class="form-group">
-                        <label style="font-weight:600">Auto-generate password</label>
-                        <input type="checkbox" id="det_password_toggle" name="auto_password_det" checked onclick="togglePasswordRow('det_password_toggle','det_password_row','det_password_input')">
-                    </div>
-                    <div class="form-group" id="det_password_row" style="display:none;">
-                        <label>Password</label>
-                        <input type="password" id="det_password_input" name="password" placeholder="Enter password to override auto-generation">
-                    </div>
-                </div>
+
+<div class="form-row full">
+    <div class="form-group">
+        <label>Password </label>
+        <input type="password" name="password" placeholder="Enter password ">
+    </div>
+</div>
                 <button type="submit">Add Student</button>
             </form>
         </div>
@@ -1090,91 +1089,75 @@ $providers = getAllProviders($conn);
     </div>
 
     <!-- SUBJECTS SECTION -->
-    <div class="section <?= $section == 'subjects' ? 'active' : '' ?>">
-        <h2>📚 Subject Management</h2>
-        
-        <div class="card">
-            <h3>Add New Subject</h3>
-            <form method="POST" enctype="multipart/form-data">
-                <input type="hidden" name="action" value="add_subject">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Subject Code</label>
-                        <input type="text" name="subject_code" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Title</label>
-                        <input type="text" name="title" required>
-                    </div>
+  <div class="section <?= $section == 'subjects' ? 'active' : '' ?>">
+    <h2>📚 Subject Management</h2>
+    
+    <div class="card">
+        <h3>Add New Subject</h3>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="action" value="add_subject">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Subject Code</label>
+                    <input type="text" name="subject_code" required>
                 </div>
-                <div class="form-row full">
-                    <div class="form-group">
-                        <label>Description</label>
-                        <input type="text" name="description" placeholder="Optional description">
-                    </div>
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" name="title" required>
                 </div>
-                <div class="form-row full">
-                    <div class="form-group">
-                        <label>Level</label>
-                        <select name="level">
-                            <option value="">(Select level)</option>
-                            <option value="Elementary">Elementary</option>
-                            <option value="High School">High School</option>
-                            <option value="Senior High School">Senior High School</option>
-                            <option value="College">College</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        
-                    </div>
+            </div>
+            <div class="form-row full">
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" name="description" placeholder="Optional description">
                 </div>
-                <button type="submit">Add Subject</button>
-            </form>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Code</th>
-                    <th>Title</th>
-                    <th>Level</th>
-                    <th>Description</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach($subjects as $subj): ?>
-                <tr>
-                    <td><?= htmlspecialchars($subj['subject_code']) ?></td>
-                    <td><?= htmlspecialchars($subj['title']) ?></td>
-                    <td><?= htmlspecialchars($subj['level'] ?? '—') ?></td>
-                    <td><?= htmlspecialchars($subj['description'] ?? '') ?></td>
-                    <td>
-                        <?php
-                        $fileUrl = '';
-                        if (!empty($subj['resource_file'])) { $fileUrl = $subj['resource_file']; }
-                        elseif (!empty($subj['file_path'])) { $fileUrl = $subj['file_path']; }
-                        elseif (!empty($subj['subject_file'])) { $fileUrl = $subj['subject_file']; }
-                        ?>
-                        <?php if (!empty($fileUrl)): ?>
-                            <a href="<?= htmlspecialchars($fileUrl) ?>" target="_blank">View</a>
-                        <?php else: ?>
-                            —
-                        <?php endif; ?>
-                    </td>
-                    <td class="action-buttons">
-                        <button class="btn-edit" onclick="editItem('subject', <?= htmlspecialchars(json_encode($subj)) ?>)">✎ Edit</button>
-                        <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this subject?')">
-                            <input type="hidden" name="action" value="archive_subject">
-                            <input type="hidden" name="subject_id" value="<?= $subj['id'] ?>">
-                            <button class="btn-delete" type="submit">🗑 Delete</button>
-                        </form>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+            </div>
+            <div class="form-row full">
+                <div class="form-group">
+                    <label>Level</label>
+                    <select name="level">
+                        <option value="">(Select level)</option>
+                        <option value="Elementary">Elementary</option>
+                        <option value="High School">High School</option>
+                        <option value="Senior High School">Senior High School</option>
+                        <option value="College">College</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit">Add Subject</button>
+        </form>
     </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Title</th>
+                <th>Level</th>
+                <th>Description</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach($subjects as $subj): ?>
+            <tr>
+                <td><?= htmlspecialchars($subj['subject_code']) ?></td>
+                <td><?= htmlspecialchars($subj['title']) ?></td>
+                <td><?= htmlspecialchars($subj['level'] ?? '—') ?></td>
+                <td><?= htmlspecialchars($subj['description'] ?? '') ?></td>
+                <td class="action-buttons">
+                    <button class="btn-edit" onclick="editItem('subject', <?= htmlspecialchars(json_encode($subj)) ?>)">✎ Edit</button>
+                    <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this subject?')">
+                        <input type="hidden" name="action" value="archive_subject">
+                        <input type="hidden" name="subject_id" value="<?= $subj['id'] ?>">
+                        <button class="btn-delete" type="submit">🗑 Delete</button>
+                    </form>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
 
     <!-- Edit Subject Modal -->
     <div id="edit_subject_modal" class="modal">
