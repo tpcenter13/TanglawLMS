@@ -1338,6 +1338,109 @@ $providers = getAllProviders($conn);
     </div>
 
 </div>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<script>
+// EmailJS Configuration
+const EMAILJS_PUBLIC_KEY = "bjKEcCXpriGPTWoIB";
+const EMAILJS_SERVICE_ID = "service_4viy27k";
+const EMAILJS_TEMPLATE_ID = "template_1axzswl";
 
+// Initialize EmailJS
+emailjs.init(EMAILJS_PUBLIC_KEY);
+console.log('✅ EmailJS initialized');
+
+// Intercept all password reset form submissions
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔍 Looking for reset forms...');
+    
+    // Find ALL forms on the page
+    const allForms = document.querySelectorAll('form');
+    console.log('Found', allForms.length, 'forms total');
+    
+    allForms.forEach((form, index) => {
+        // Check if this form has send_reset_email action
+        const actionInput = form.querySelector('input[name="action"][value="send_reset_email"]');
+        
+        if (actionInput) {
+            console.log('✅ Found reset form #' + index);
+            
+            form.addEventListener('submit', function(e) {
+                e.preventDefault(); // Stop default submission
+                e.stopPropagation();
+                
+                console.log('🚀 Reset form submitted!');
+                
+                const formData = new FormData(this);
+                const role = formData.get('role');
+                const userId = formData.get('user_id');
+                
+                console.log('=== Password Reset via EmailJS ===');
+                console.log('Role:', role);
+                console.log('User ID:', userId);
+                
+                // Show loading state
+                const submitButton = this.querySelector('button[type="submit"]');
+                const originalText = submitButton.innerHTML;
+                submitButton.disabled = true;
+                submitButton.innerHTML = '⏳ Sending...';
+                
+                // Make AJAX call to PHP to generate token and get user data
+                fetch('admin_reset_handler.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'action=generate_reset_token&role=' + encodeURIComponent(role) + '&user_id=' + encodeURIComponent(userId)
+                })
+                .then(response => {
+                    console.log('📡 Got response from PHP');
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('📦 PHP Response:', data);
+                    
+                    if (data.success) {
+                        // Build reset link
+                        const resetLink = window.location.origin + 
+                                        window.location.pathname.replace('admin_dashboard.php', 'reset_password.php') + 
+                                        '?token=' + data.token;
+                        
+                        // Send email via EmailJS
+                        const templateParams = {
+                            to_email: data.email,
+                            name: data.name,
+                            message: resetLink,
+                            email: data.email,
+                            year: new Date().getFullYear()
+                        };
+                        
+                        console.log('📧 Sending email to:', data.email);
+                        console.log('🔗 Reset link:', resetLink);
+                        console.log('📨 Template params:', templateParams);
+                        
+                        return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+                    } else {
+                        throw new Error(data.message || 'Failed to generate reset token');
+                    }
+                })
+                .then(response => {
+                    console.log('✅ EmailJS SUCCESS!', response);
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalText;
+                    alert('✅ Password reset email sent successfully!');
+                })
+                .catch(error => {
+                    console.error('❌ Error:', error);
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalText;
+                    alert('❌ Failed to send reset email: ' + error.message);
+                });
+                
+                return false;
+            });
+        }
+    });
+});
+</script>
 </body>
 </html>
