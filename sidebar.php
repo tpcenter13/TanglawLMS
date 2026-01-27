@@ -9,15 +9,17 @@ $role = $_SESSION['loggedUser']['role'] ?? '';
 
 $menuItems = [];
 if ($role === 'admin') {
-    $menuItems = [
-        'dashboard' => ['label' => 'Dashboard', 'icon' => '📊', 'url' => '?section=dashboard'],
-        'teachers' => ['label' => 'Teachers', 'icon' => '👨‍🏫', 'url' => '?section=teachers'],
-        'facilitators' => ['label' => 'Facilitators', 'icon' => '👥', 'url' => '?section=facilitators'],
-        'detainees' => ['label' => 'Students', 'icon' => '👨‍🎓', 'url' => '?section=detainees'],
-        'subjects' => ['label' => 'Subjects', 'icon' => '📚', 'url' => '?section=subjects'],
-        'grades' => ['label' => 'Grade Levels', 'icon' => '📊', 'url' => '?section=grades'],
-        'providers' => ['label' => 'Providers', 'icon' => '🏢', 'url' => '?section=providers'],
-    ];
+$menuItems = [
+    'dashboard' => ['label' => 'Dashboard', 'icon' => '📊', 'url' => 'admin_dashboard.php?section=dashboard'],
+    'teachers' => ['label' => 'Teachers', 'icon' => '👨‍🏫', 'url' => 'admin_dashboard.php?section=teachers'],
+    'facilitators' => ['label' => 'Facilitators', 'icon' => '👥', 'url' => 'admin_dashboard.php?section=facilitators'],
+    'detainees' => ['label' => 'Students', 'icon' => '👨‍🎓', 'url' => 'admin_dashboard.php?section=detainees'],
+    'subjects' => ['label' => 'Subjects', 'icon' => '📚', 'url' => 'admin_dashboard.php?section=subjects'],
+    'grades' => ['label' => 'Grade Levels', 'icon' => '📊', 'url' => 'admin_dashboard.php?section=grades'],
+    'providers' => ['label' => 'Providers', 'icon' => '🏢', 'url' => 'admin_dashboard.php?section=providers'],
+    'reset_requests' => ['label' => 'Password Resets', 'icon' => '🔐', 'url' => 'password_reset_requests.php'],
+];
+
 } elseif ($role === 'teacher') {
     $menuItems = [
         'dashboard' => ['label' => 'Dashboard', 'icon' => '📊', 'url' => '?section=dashboard'],
@@ -436,6 +438,7 @@ if ($role === 'admin') {
             <?php endforeach; ?>
         </div>
     </nav>
+
 
     <div class="nav-logout">
         <a href="change_password.php" onclick="if(window.innerWidth <= 768) document.body.classList.remove('sidebar-open')">

@@ -10,138 +10,183 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action']) && $_POST['action'] === 'forgot') {
         $forgot_email = trim($_POST['forgot_email'] ?? '');
         $forgot_role = trim($_POST['forgot_role'] ?? '');
+        
         if (empty($forgot_email) || empty($forgot_role)) {
-            $error = 'Please provide your email and role for password assistance.';
+            $error = '❌ Please provide your email and role for password assistance.';
         } else {
-            // Send notification to admin email configured in config_email.php (fallback to no-reply)
-            if (file_exists('config_email.php')) {
-                include 'config_email.php';
-                $adminEmail = defined('MAIL_FROM_EMAIL') ? MAIL_FROM_EMAIL : 'no-reply@localhost';
+            // Validate email format
+            if (!filter_var($forgot_email, FILTER_VALIDATE_EMAIL)) {
+                $error = '❌ Please provide a valid email address.';
             } else {
-                $adminEmail = 'no-reply@localhost';
+                // Check if user exists with this email and role
+                $user_exists = false;
+                $user_id = null;
+                
+                if ($forgot_role == 'teacher') {
+                    $stmt = $conn->prepare("SELECT id, email FROM teachers WHERE email = ? AND archived = 0 LIMIT 1");
+                } elseif ($forgot_role == 'facilitator') {
+                    $stmt = $conn->prepare("SELECT id, email FROM facilitators WHERE email = ? AND archived = 0 LIMIT 1");
+                } else {
+                    $stmt = $conn->prepare("SELECT id, email FROM detainees WHERE email = ? AND archived = 0 LIMIT 1");
+                }
+                
+                if ($stmt) {
+                    $stmt->bind_param("s", $forgot_email);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    
+                    if ($result->num_rows > 0) {
+                        $user_data = $result->fetch_assoc();
+                        $user_exists = true;
+                        $user_id = $user_data['id'];
+                    }
+                    $stmt->close();
+                }
+                
+                if (!$user_exists) {
+                    $error = '❌ No ' . htmlspecialchars($forgot_role) . ' account found with this email address.';
+                } else {
+                    // Insert password reset request
+                    $insert_stmt = $conn->prepare("INSERT INTO password_reset_requests (email, role, user_id, status) VALUES (?, ?, ?, 'pending')");
+                    
+                    if ($insert_stmt) {
+                        $insert_stmt->bind_param("ssi", $forgot_email, $forgot_role, $user_id);
+                        
+                        if ($insert_stmt->execute()) {
+                            $success = '✅ Your password reset request has been sent to the administrator. They will contact you via email soon.';
+                        } else {
+                            $error = '❌ Failed to submit request. Please try again.';
+                        }
+                        
+                        $insert_stmt->close();
+                    } else {
+                        $error = '❌ System error. Please contact support.';
+                    }
+                }
             }
-            $subject = "Tanglaw Learn - Password Assistance Request";
-            $body = "A user has requested password assistance.<br><br>";
-            $body .= "Email: " . htmlspecialchars($forgot_email) . "<br>";
-            $body .= "Role: " . htmlspecialchars($forgot_role) . "<br>";
-            $body .= "Please contact the user with their account details.<br>";
-            $headers  = "MIME-Version: 1.0" . "\r\n";
-            $headers .= "Content-type: text/html; charset=UTF-8" . "\r\n";
-            $headers .= "From: Tanglaw Learn <" . $adminEmail . ">" . "\r\n";
-            @mail($adminEmail, $subject, $body, $headers);
-            $success = '✅ Your request has been sent to the administrator. They will contact you via email.';
         }
     }
-    $username = trim($_POST['username'] ?? '');
-    $password = trim($_POST['password'] ?? '');
-    $role = trim($_POST['role'] ?? '');
     
-    // Validate required fields
-    if (empty($username) || empty($role)) {
-        $error = "Please fill in all required fields.";
-    } elseif ($role === 'admin' && empty($password)) {
-        $error = "Password is required for admin login.";
-    } else {
-        $redirect_url = '';
-        $found_user = false;
+    // Handle regular login
+    if (!isset($_POST['action']) || $_POST['action'] !== 'forgot') {
+        $username = trim($_POST['username'] ?? '');
+        $password = trim($_POST['password'] ?? '');
+        $role = trim($_POST['role'] ?? '');
         
-        // Check Admin
-        if ($role == 'admin') {
-            // For demo: admin / admin123
-            if ($username === 'admin' && $password === 'admin123') {
-                $_SESSION['loggedUser'] = [
-                    'id' => 0,
-                    'name' => 'Administrator',
-                    'role' => 'admin'
-                ];
-                $redirect_url = 'admin_dashboard.php';
-                $found_user = true;
-            } else {
-                // Invalid admin credentials
-                $error = "❌ Invalid admin credentials.";
+        // Validate required fields
+        if (empty($username) || empty($role)) {
+            $error = "❌ Please fill in all required fields.";
+        } elseif ($role === 'admin' && empty($password)) {
+            $error = "❌ Password is required for admin login.";
+        } else {
+            $redirect_url = '';
+            $found_user = false;
+            
+            // Check Admin
+            if ($role == 'admin') {
+                if ($username === 'admin' && $password === 'admin123') {
+                    $_SESSION['loggedUser'] = [
+                        'id' => 0,
+                        'name' => 'Administrator',
+                        'role' => 'admin'
+                    ];
+                    $redirect_url = 'admin_dashboard.php';
+                    $found_user = true;
+                } else {
+                    $error = "❌ Invalid admin credentials.";
+                }
             }
-        }
-        
-        // Check Teacher
-        elseif ($role == 'teacher') {
-            $stmt = $conn->prepare("SELECT id, name, password FROM teachers WHERE id_number = ? AND archived = 0 LIMIT 1");
-            if (!$stmt) {
-                $error = "❌ Database error: " . $conn->error;
-            } else {
-                $stmt->bind_param("s", $username);
-                $stmt->execute();
-                $stmt->bind_result($t_id, $t_name, $t_hash);
-                if ($stmt->fetch()) {
-                    // If password hash exists, verify. Otherwise allow legacy login without password.
-                    if (!empty($t_hash)) {
-                        if (empty($password)) {
-                            $error = 'Password is required.';
-                        } elseif (password_verify($password, $t_hash)) {
+            
+            // Check Teacher
+            elseif ($role == 'teacher') {
+                $stmt = $conn->prepare("SELECT id, name, password FROM teachers WHERE id_number = ? AND archived = 0 LIMIT 1");
+                if (!$stmt) {
+                    $error = "❌ Database error: " . $conn->error;
+                } else {
+                    $stmt->bind_param("s", $username);
+                    $stmt->execute();
+                    $stmt->bind_result($t_id, $t_name, $t_hash);
+                    if ($stmt->fetch()) {
+                        if (!empty($t_hash)) {
+                            if (empty($password)) {
+                                $error = '❌ Password is required.';
+                            } elseif (password_verify($password, $t_hash)) {
+                                $_SESSION['loggedUser'] = [ 'id' => $t_id, 'name' => $t_name, 'role' => 'teacher' ];
+                                $redirect_url = 'teacher_dashboard.php';
+                                $found_user = true;
+                            } else {
+                                $error = '❌ Invalid credentials.';
+                            }
+                        } else {
                             $_SESSION['loggedUser'] = [ 'id' => $t_id, 'name' => $t_name, 'role' => 'teacher' ];
                             $redirect_url = 'teacher_dashboard.php';
                             $found_user = true;
-                        } else {
-                            $error = '❌ Invalid credentials.';
                         }
-                    } else {
-                        // legacy: no password set yet
-                        $_SESSION['loggedUser'] = [ 'id' => $t_id, 'name' => $t_name, 'role' => 'teacher' ];
-                        $redirect_url = 'teacher_dashboard.php';
-                        $found_user = true;
                     }
+                    $stmt->close();
                 }
-                $stmt->close();
             }
-        }
-        
-        // Check Facilitator
-        elseif ($role == 'facilitator') {
-            $stmt = $conn->prepare("SELECT id, name, password FROM facilitators WHERE id_number = ? AND archived = 0 LIMIT 1");
-            if (!$stmt) {
-                $error = "❌ Database error: " . $conn->error;
-            } else {
-                $stmt->bind_param("s", $username);
-                $stmt->execute();
-                $stmt->bind_result($f_id, $f_name, $f_hash);
-                if ($stmt->fetch()) {
-                    if (!empty($f_hash)) {
-                        if (empty($password)) {
-                            $error = 'Password is required.';
-                        } elseif (password_verify($password, $f_hash)) {
+            
+            // Check Facilitator
+            elseif ($role == 'facilitator') {
+                $stmt = $conn->prepare("SELECT id, name, password FROM facilitators WHERE id_number = ? AND archived = 0 LIMIT 1");
+                if (!$stmt) {
+                    $error = "❌ Database error: " . $conn->error;
+                } else {
+                    $stmt->bind_param("s", $username);
+                    $stmt->execute();
+                    $stmt->bind_result($f_id, $f_name, $f_hash);
+                    if ($stmt->fetch()) {
+                        if (!empty($f_hash)) {
+                            if (empty($password)) {
+                                $error = '❌ Password is required.';
+                            } elseif (password_verify($password, $f_hash)) {
+                                $_SESSION['loggedUser'] = [ 'id' => $f_id, 'name' => $f_name, 'role' => 'facilitator' ];
+                                $redirect_url = 'facilitator_dashboard.php';
+                                $found_user = true;
+                            } else {
+                                $error = '❌ Invalid credentials.';
+                            }
+                        } else {
                             $_SESSION['loggedUser'] = [ 'id' => $f_id, 'name' => $f_name, 'role' => 'facilitator' ];
                             $redirect_url = 'facilitator_dashboard.php';
                             $found_user = true;
-                        } else {
-                            $error = '❌ Invalid credentials.';
                         }
-                    } else {
-                        $_SESSION['loggedUser'] = [ 'id' => $f_id, 'name' => $f_name, 'role' => 'facilitator' ];
-                        $redirect_url = 'facilitator_dashboard.php';
-                        $found_user = true;
                     }
+                    $stmt->close();
                 }
-                $stmt->close();
             }
-        }
-        
-        // Check Detainee
-        elseif ($role == 'detainee') {
-            // Try to resolve grade_level_id by joining grade_levels (if mapping exists)
-            $stmt = $conn->prepare("SELECT d.id, d.name, d.grade_level, gl.id AS grade_level_id, d.password
-                FROM detainees d
-                LEFT JOIN grade_levels gl ON gl.level = d.grade_level
-                WHERE d.id_number = ? AND d.archived = 0 LIMIT 1");
-            if (!$stmt) {
-                $error = "❌ Database error: " . $conn->error;
-            } else {
-                $stmt->bind_param("s", $username);
-                $stmt->execute();
-                $stmt->bind_result($d_id, $d_name, $d_grade_level, $d_grade_level_id, $d_hash);
-                if ($stmt->fetch()) {
-                    if (!empty($d_hash)) {
-                        if (empty($password)) {
-                            $error = 'Password is required.';
-                        } elseif (password_verify($password, $d_hash)) {
+            
+            // Check Detainee
+            elseif ($role == 'detainee') {
+                $stmt = $conn->prepare("SELECT d.id, d.name, d.grade_level, gl.id AS grade_level_id, d.password
+                    FROM detainees d
+                    LEFT JOIN grade_levels gl ON gl.level = d.grade_level
+                    WHERE d.id_number = ? AND d.archived = 0 LIMIT 1");
+                if (!$stmt) {
+                    $error = "❌ Database error: " . $conn->error;
+                } else {
+                    $stmt->bind_param("s", $username);
+                    $stmt->execute();
+                    $stmt->bind_result($d_id, $d_name, $d_grade_level, $d_grade_level_id, $d_hash);
+                    if ($stmt->fetch()) {
+                        if (!empty($d_hash)) {
+                            if (empty($password)) {
+                                $error = '❌ Password is required.';
+                            } elseif (password_verify($password, $d_hash)) {
+                                $_SESSION['loggedUser'] = [
+                                    'id' => $d_id,
+                                    'name' => $d_name,
+                                    'grade_level' => $d_grade_level,
+                                    'grade_level_id' => $d_grade_level_id ? (int)$d_grade_level_id : null,
+                                    'role' => 'detainee'
+                                ];
+                                $redirect_url = 'student_dashboard.php';
+                                $found_user = true;
+                            } else {
+                                $error = '❌ Invalid credentials.';
+                            }
+                        } else {
                             $_SESSION['loggedUser'] = [
                                 'id' => $d_id,
                                 'name' => $d_name,
@@ -151,37 +196,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             ];
                             $redirect_url = 'student_dashboard.php';
                             $found_user = true;
-                        } else {
-                            $error = '❌ Invalid credentials.';
                         }
-                    } else {
-                        // legacy: allow login without password
-                        $_SESSION['loggedUser'] = [
-                            'id' => $d_id,
-                            'name' => $d_name,
-                            'grade_level' => $d_grade_level,
-                            'grade_level_id' => $d_grade_level_id ? (int)$d_grade_level_id : null,
-                            'role' => 'detainee'
-                        ];
-                        $redirect_url = 'student_dashboard.php';
-                        $found_user = true;
                     }
+                    $stmt->close();
                 }
-                $stmt->close();
             }
-        }
-        
-        if ($found_user) {
-            $success = "✅ Login successful! Redirecting...";
-            header("refresh:1.5;url=$redirect_url");
-        } else {
-            // If a more specific error was set (e.g. DB prepare error), keep it.
-            if (empty($error)) {
-                // Provide role-specific not-found message
-                $error = "❌ No " . htmlspecialchars($role) . " found with that ID number.";
+            
+            if ($found_user) {
+                $success = "✅ Login successful! Redirecting...";
+                header("refresh:1.5;url=$redirect_url");
+            } else {
+                if (empty($error)) {
+                    $error = "❌ No " . htmlspecialchars($role) . " found with that ID number.";
+                }
+                error_log("Login failed for role={$role}, username={$username}");
             }
-            // Log the failed attempt for debugging (no sensitive data)
-            error_log("Login failed for role={$role}, username={$username}");
         }
     }
 }
@@ -196,8 +225,6 @@ $conn->close();
     <title>Login - Tanglaw LMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
-      
-      
         body {
             margin: 0;
             padding: 0;
@@ -335,15 +362,6 @@ $conn->close();
             font-size: 12px;
             color: var(--muted);
         }
-        .role-info {
-            background: #f0f9ff;
-            border: 1px solid #bfdbfe;
-            padding: 12px;
-            border-radius: 6px;
-            margin-bottom: 16px;
-            font-size: 12px;
-            line-height: 1.5;
-        }
         @media (max-width: 768px) {
             .login-wrapper {
                 grid-template-columns: 1fr;
@@ -352,21 +370,149 @@ $conn->close();
                 display: none;
             }
         }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(4px);
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 28px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .modal-content h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #1f2937;
+            font-size: 20px;
+        }
+        
+        .modal-content .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .modal-content label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+        }
+        
+        .modal-content input,
+        .modal-content select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        
+        .modal-content input:focus,
+        .modal-content select:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        
+        .modal-buttons button {
+            padding: 10px 20px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .btn-cancel {
+            background: #f3f4f6;
+            color: #374151;
+        }
+        
+        .btn-cancel:hover {
+            background: #e5e7eb;
+        }
+        
+        .btn-submit {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .btn-submit:hover {
+            background: #1d4ed8;
+        }
+        
+        .forgot-link {
+            text-align: center;
+            margin-top: 12px;
+        }
+        
+        .forgot-link a {
+            font-size: 13px;
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .forgot-link a:hover {
+            text-decoration: underline;
+        }
+        
+        .password-field-wrapper {
+            position: relative;
+        }
+        
+        .password-field-wrapper input {
+            padding-right: 45px;
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            user-select: none;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6b7280;
+        }
+        
+        .password-toggle:hover {
+            color: #374151;
+        }
     </style>
 </head>
 <body>
-  
-  <script>
-function togglePassword() {
-    const input = document.getElementById('password');
-    if (input.type === 'password') {
-        input.type = 'text';
-    } else {
-        input.type = 'password';
-    }
-}
-</script>
-  
+
 <div class="login-wrapper">
     <div class="login-right">
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 40px;">
@@ -400,17 +546,16 @@ function togglePassword() {
         </div>
     </div>
     
-    <!-- RIGHT COLUMN: LOGIN FORM -->
     <div class="login-left">
         <div class="login-container">
             <div class="login-card">
                 
                 <?php if ($error): ?>
-                    <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
+                    <div class="alert alert-error"><?= $error ?></div>
                 <?php endif; ?>
                 
                 <?php if ($success): ?>
-                    <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
+                    <div class="alert alert-success"><?= $success ?></div>
                 <?php endif; ?>
                 
                 <h1>🎓 Tanglaw Learn</h1>
@@ -420,35 +565,90 @@ function togglePassword() {
                         <label for="role">Login as</label>
                         <select id="role" name="role" required onchange="updateInfo()">
                             <option value="">Select User Type</option>
-                            <option value="admin"> Admin</option>
-                            <option value="teacher"> Teacher</option>
-                            <option value="facilitator"> Facilitator</option>
-                            <option value="detainee"> Student</option>
+                            <option value="admin">👨‍💼 Admin</option>
+                            <option value="teacher">👨‍🏫 Teacher</option>
+                            <option value="facilitator">👥 Facilitator</option>
+                            <option value="detainee">👨‍🎓 Student</option>
                         </select>
                     </div>
                     
-<div class="form-group">
-    <label for="username">ID Number or Username</label>
-    <input type="text" id="username" name="username" placeholder="Enter your ID number" required>
+                    <div class="form-group">
+                        <label for="username">ID Number or Username</label>
+                        <input type="text" id="username" name="username" placeholder="Enter your ID number" required>
+                    </div>
+
+                    <div class="form-group password-field-wrapper" id="password-group" style="display: none;">
+                        <label for="password">Password <span style="color: #ef4444;">*</span></label>
+                        <input type="password" id="password" name="password" placeholder="Enter your password">
+                        <span class="password-toggle" onclick="togglePassword()">
+                            <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </span>
+                    </div>
+                    
+                    <button type="submit" class="login-btn">Login</button>
+                    
+                    <div class="forgot-link">
+                        <a href="#" onclick="openForgotModal(); return false;">Forgot password?</a>
+                    </div>
+                </form>
+                
+                <div class="login-footer"></div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="form-group" id="password-group" style="flex-direction: column; position: relative;">
-    <label for="password">Password <span style="color: #ef4444;">*</span></label>
-
-    <input type="password" id="password" name="password" placeholder="Enter your password"
-        style="padding-right: 40px;">
-
-    <!-- Eye Icon (SVG, Clean & Modern) -->
-    <span onclick="togglePassword()" 
-          style="position:absolute; right:15px; top:30px; cursor:pointer; user-select:none; width:22px;">
-        <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
-            <circle cx="12" cy="12" r="3"/>
-        </svg>
-    </span>
+<!-- Forgot Password Modal -->
+<div id="forgotModal" class="modal">
+    <div class="modal-content">
+        <h3>🔐 Forgot Password</h3>
+        <form method="POST" id="forgotForm">
+            <input type="hidden" name="action" value="forgot">
+            
+            <div class="form-group">
+                <label for="forgot_role">Your Role</label>
+                <select name="forgot_role" id="forgot_role" required>
+                    <option value="">Select your role</option>
+                    <option value="teacher">👨‍🏫 Teacher</option>
+                    <option value="facilitator">👥 Facilitator</option>
+                    <option value="detainee">👨‍🎓 Student</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="forgot_email">Email Address</label>
+                <input type="email" name="forgot_email" id="forgot_email" placeholder="your.email@example.com" required>
+            </div>
+            
+            <p style="font-size: 13px; color: #6b7280; margin-top: 12px;">
+                ℹ️ Your request will be sent to the administrator who will help you reset your password.
+            </p>
+            
+            <div class="modal-buttons">
+                <button type="button" class="btn-cancel" onclick="closeForgotModal()">Cancel</button>
+                <button type="submit" class="btn-submit">Send Request</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <script>
+function updateInfo() {
+    const role = document.getElementById('role').value;
+    const passwordGroup = document.getElementById('password-group');
+    const passwordInput = document.getElementById('password');
+
+    if (role === '') {
+        passwordGroup.style.display = 'none';
+        passwordInput.value = '';
+    } else {
+        passwordGroup.style.display = 'block';
+    }
+}
+
 function togglePassword() {
     const pwd = document.getElementById("password");
     const icon = document.getElementById("eyeIcon");
@@ -470,94 +670,30 @@ function togglePassword() {
         `;
     }
 }
-</script>
 
-
-<script>
-function togglePassword() {
-    const pwd = document.getElementById("password");
-    pwd.type = pwd.type === "password" ? "text" : "password";
+function openForgotModal() {
+    document.getElementById('forgotModal').classList.add('show');
 }
-</script>
 
-
-<script>
-function togglePassword() {
-    const pwd = document.getElementById("password");
-    pwd.type = pwd.type === "password" ? "text" : "password";
+function closeForgotModal() {
+    document.getElementById('forgotModal').classList.remove('show');
 }
-</script>
 
-
-
-                    
-                    <!-- role-help removed per request -->
-                    
-                    <button type="submit" class="login-btn">Login</button>
-                    <div style="text-align:center; margin-top:8px;">
-                        <a href="#" onclick="openForgot(); return false;" style="font-size:13px; color:#2563eb;">Forgot password?</a>
-                    </div>
-                </form>
-                
-                <div class="login-footer"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-function updateInfo() {
-    const role = document.getElementById('role').value;
-    const passwordGroup = document.getElementById('password-group');
-    const passwordInput = document.getElementById('password');
-
-    // Show password field for all roles (admin, teacher, facilitator, detainee)
-    if (role === '') {
-        passwordGroup.style.display = 'none';
-        passwordInput.value = '';
-    } else {
-        passwordGroup.style.display = 'flex';
+// Close modal on outside click
+window.onclick = function(event) {
+    const modal = document.getElementById('forgotModal');
+    if (event.target === modal) {
+        closeForgotModal();
     }
 }
-</script>
 
-<!-- Forgot password modal -->
-<div id="forgotModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:9999;"> 
-    <div style="background:white; padding:20px; border-radius:8px; width:320px;">
-        <h3 style="margin-top:0">Forgot Password</h3>
-        <form method="POST" onsubmit="return submitForgot(this);">
-            <input type="hidden" name="action" value="forgot">
-            <div style="margin-bottom:8px;"><label>Role</label><br>
-                <select name="forgot_role" required>
-                    <option value="teacher">Teacher</option>
-                    <option value="facilitator">Facilitator</option>
-                    <option value="detainee">Student</option>
-                </select>
-            </div>
-            <div style="margin-bottom:8px;"><label>Email</label><br>
-                <input type="email" name="forgot_email" required style="width:100%; padding:8px;">
-            </div>
-            <div style="display:flex; gap:8px; justify-content:flex-end;">
-                <button type="button" onclick="closeForgot()" style="background:#eee;padding:8px;border-radius:6px;border:0;">Cancel</button>
-                <button type="submit" style="background:#2563eb;color:white;padding:8px;border-radius:6px;border:0;">Send</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<script>
-function openForgot() { document.getElementById('forgotModal').style.display = 'flex'; }
-function closeForgot(){ document.getElementById('forgotModal').style.display = 'none'; }
-function submitForgot(form){
-    // simple client-side UX
-    var btn = form.querySelector('button[type=submit]');
-    btn.disabled = true; btn.innerText = 'Sending...';
-    return true; // allow normal submit
-}
+// Close modal on Escape key
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeForgotModal();
+    }
+});
 </script>
 
 </body>
 </html>
-
-
-ito full code
