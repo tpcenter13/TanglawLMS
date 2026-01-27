@@ -32,17 +32,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 $subject_id = $_POST['subject_id'];
                 $grade_level_id = $_POST['grade_level_id'];
                 
-                $stmt = $conn->prepare("INSERT INTO modules (title, subject_id, grade_level_id, file_path, teacher_id) VALUES (?, ?, ?, ?, ?)");
-                $stmt->bind_param("siisi", $title, $subject_id, $grade_level_id, $filepath, $teacher_id);
+                // Check for duplicate module
+                $checkStmt = $conn->prepare("SELECT id FROM modules WHERE title = ? AND subject_id = ? AND grade_level_id = ? AND teacher_id = ?");
+                $checkStmt->bind_param("siii", $title, $subject_id, $grade_level_id, $teacher_id);
+                $checkStmt->execute();
+                $existingModule = $checkStmt->get_result();
                 
-                if ($stmt->execute()) {
-                    $message = '✅ Module uploaded successfully';
+                if ($existingModule->num_rows > 0) {
+                    // Module already exists - delete uploaded file and show error
+                    if (file_exists($filepath)) {
+                        @unlink($filepath);
+                    }
+                    $message = 'A module with this exact title, subject, and grade level already exists';
+                    $checkStmt->close();
                 } else {
-                    $message = '❌ Error saving module';
+                    // Module doesn't exist - proceed with insertion
+                    $stmt = $conn->prepare("INSERT INTO modules (title, subject_id, grade_level_id, file_path, teacher_id) VALUES (?, ?, ?, ?, ?)");
+                    $stmt->bind_param("siisi", $title, $subject_id, $grade_level_id, $filepath, $teacher_id);
+                    
+                    if ($stmt->execute()) {
+                        $message = 'Module uploaded successfully';
+                    } else {
+                        $message = 'Error saving module';
+                    }
+                    $stmt->close();
+                    $checkStmt->close();
                 }
-                $stmt->close();
             } else {
-                $message = '❌ Error uploading file';
+                $message = 'Error uploading file';
             }
         }
     }
@@ -83,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         $grade = $_POST['grade'];
         $comments = $_POST['comments'];
         
-        $stmt = $conn->prepare("UPDATE submissions SET grade = ?, comments = ?, status = 'graded' WHERE id = ?");
+        $stmt = $conn->prepare("UPDATE activity_submissions SET grade = ?, comments = ?, status = 'graded' WHERE id = ?");
         $stmt->bind_param("dsi", $grade, $comments, $submission_id);
         
         if ($stmt->execute()) {
@@ -270,9 +287,10 @@ $activity_sheets = $conn->query("SELECT a.*, m.title as module_title FROM activi
     LEFT JOIN modules m ON a.module_id = m.id 
     WHERE a.teacher_id = $teacher_id ORDER BY a.created_at DESC")->fetch_all(MYSQLI_ASSOC);
 
-$submissions = $conn->query("SELECT s.*, det.name, a.title as activity_title FROM submissions s 
-    JOIN detainees det ON s.detainee_id = det.id 
-    JOIN activity_sheets a ON s.activity_sheet_id = a.id 
+// Updated query for submissions: Use student_id and module_id, join on modules instead of activity_sheets
+$submissions = $conn->query("SELECT s.*, det.name, m.title as module_title FROM activity_submissions s 
+    JOIN detainees det ON s.student_id = det.id 
+    JOIN modules m ON s.module_id = m.id 
     ORDER BY s.submitted_at DESC")->fetch_all(MYSQLI_ASSOC);
 
 $subjects = $conn->query("SELECT * FROM subjects WHERE archived = 0 ORDER BY title")->fetch_all(MYSQLI_ASSOC);
@@ -299,7 +317,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
             top: 0;
             left: 0;
             z-index: 300;
-           	height: 50px;
+               height: 50px;
         }
         .teacher-header .container {
             max-width: 1200px;
@@ -687,7 +705,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
             <thead>
                 <tr>
                     <th>Detainee</th>
-                    <th>Activity</th>
+                    <th>Module</th>
                     <th>Submitted</th>
                     <th>Status</th>
                     <th>Grade</th>
@@ -697,7 +715,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
                 <?php foreach($submissions as $sub): ?>
                 <tr>
                     <td><?= htmlspecialchars($sub['name']) ?></td>
-                    <td><?= htmlspecialchars($sub['activity_title']) ?></td>
+                    <td><?= htmlspecialchars($sub['module_title']) ?></td>
                     <td><?= date('M d, Y H:i', strtotime($sub['submitted_at'])) ?></td>
                     <td><strong><?= ucfirst($sub['status']) ?></strong></td>
                     <td><?= $sub['grade'] ?? '-' ?></td>
@@ -722,7 +740,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
                             <option value="">Select Submission</option>
                             <?php foreach($submissions as $sub): ?>
                             <?php if ($sub['status'] != 'graded'): ?>
-                            <option value="<?= $sub['id'] ?>"><?= htmlspecialchars($sub['name'] . ' - ' . $sub['activity_title']) ?></option>
+                            <option value="<?= $sub['id'] ?>"><?= htmlspecialchars($sub['name'] . ' - ' . $sub['module_title']) ?></option>
                             <?php endif; ?>
                             <?php endforeach; ?>
                         </select>
@@ -818,6 +836,30 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
     document.addEventListener('DOMContentLoaded', function(){
         document.body.classList.remove('sidebar-open');
         document.body.classList.remove('sidebar-collapsed');
+
+        const moduleUploadForm = document.querySelector('form input[name="action"][value="upload_module"]')?.closest('form');
+        if (moduleUploadForm) {
+            moduleUploadForm.addEventListener('submit', function(e) {
+                const title = this.querySelector('input[name="module_title"]')?.value?.trim();
+                const subjectId = this.querySelector('select[name="subject_id"]')?.value;
+                const gradeLevelId = this.querySelector('select[name="grade_level_id"]')?.value;
+                
+                if (title && subjectId && gradeLevelId) {
+                    const existingModules = <?= json_encode($modules) ?>;
+                    const isDuplicate = existingModules.some(module => 
+                        module.title.toLowerCase() === title.toLowerCase() &&
+                        module.subject_id == subjectId &&
+                        module.grade_level_id == gradeLevelId
+                    );
+                    
+                    if (isDuplicate) {
+                        e.preventDefault();
+                        openDuplicateModal();
+                        return false;
+                    }
+                }
+            });
+        }
     });
     
     // Edit Module modal helpers
@@ -842,6 +884,36 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
     function closeEditModal() {
         var modal = document.getElementById('editModuleModal');
         if (modal) modal.style.display = 'none';
+    }
+    function checkForDuplicateModule() {
+        const title = document.querySelector('input[name="module_title"]')?.value?.trim();
+        const subjectId = document.querySelector('select[name="subject_id"]')?.value;
+        const gradeLevelId = document.querySelector('select[name="grade_level_id"]')?.value;
+        
+        if (title && subjectId && gradeLevelId) {
+            // Check against existing modules
+            const existingModules = <?= json_encode($modules) ?>;
+            const isDuplicate = existingModules.some(module => 
+                module.title.toLowerCase() === title.toLowerCase() &&
+                module.subject_id == subjectId &&
+                module.grade_level_id == gradeLevelId
+            );
+            
+            const warningElement = document.getElementById('duplicate-warning');
+            if (isDuplicate) {
+                if (!warningElement) {
+                    const warning = document.createElement('div');
+                    warning.id = 'duplicate-warning';
+                    warning.className = 'alert alert-error';
+                    warning.innerHTML = '⚠️ A module with this combination already exists';
+                    document.querySelector('form input[name="action"][value="upload_module"]').closest('form').insertBefore(warning, document.querySelector('form input[name="action"][value="upload_module"]').closest('form').firstChild);
+                }
+            } else {
+                if (warningElement) {
+                    warningElement.remove();
+                }
+            }
+        }
     }
     // close when clicking backdrop (supports both modals)
     document.addEventListener('click', function(ev){
@@ -869,5 +941,35 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
         var modal = document.getElementById('editActivityModal');
         if (modal) modal.style.display = 'none';
     }
-</script></body>
+
+    // Add this new modal for duplicate warning
+    function openDuplicateModal() {
+        var modal = document.getElementById('duplicateModal');
+        if (modal) modal.style.display = 'flex';
+    }
+    function closeDuplicateModal() {
+        var modal = document.getElementById('duplicateModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    // close when clicking backdrop (includes the new modal)
+    document.addEventListener('click', function(ev){
+        var modalModule = document.getElementById('editModuleModal');
+        var modalActivity = document.getElementById('editActivityModal');
+        var modalDuplicate = document.getElementById('duplicateModal');
+        if (modalModule && ev.target === modalModule) closeEditModal();
+        if (modalActivity && ev.target === modalActivity) closeEditActivity();
+        if (modalDuplicate && ev.target === modalDuplicate) closeDuplicateModal();
+    });
+</script>
+
+<div id="duplicateModal" style="position: fixed; left:0; top:0; width:100%; height:100%; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); z-index:500;">
+    <div class="modal-content" style="background:white; padding:20px; border-radius:8px; width:95%; max-width:500px; box-shadow:0 6px 18px rgba(0,0,0,0.12); text-align:center;">
+        <h3 style="margin-top:0; color:#991b1b;">⚠️ Duplicate Module</h3>
+        <p>A module with this exact title, subject, and grade level already exists. Please modify your input.</p>
+        <button onclick="closeDuplicateModal()" style="background:#10b981;color:white;padding:8px 12px;border:none;border-radius:6px;cursor:pointer;">Close</button>
+    </div>
+</div>
+
+</body>
 </html>

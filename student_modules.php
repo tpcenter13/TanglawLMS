@@ -1,4 +1,5 @@
 <?php
+ob_start();
 session_start();
 include 'conn.php';
 include 'header.php';
@@ -10,9 +11,31 @@ if (!isset($_SESSION['loggedUser']) || !is_array($_SESSION['loggedUser'])) {
 }
 
 $loggedUser = $_SESSION['loggedUser'];
+$studentId = $loggedUser['id'];
 $studentGrade = $loggedUser['grade_level'];
 
 include 'sidebar.php';
+
+// Handle form submissions
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+    
+    if ($action === 'mark_done') {
+        $moduleId = intval($_POST['module_id'] ?? 0);
+        
+        // Insert or update progress record
+        $stmt = $conn->prepare("INSERT INTO module_progress (student_id, module_id, status, marked_done_at) VALUES (?, ?, 'completed', NOW()) ON DUPLICATE KEY UPDATE status = 'completed', marked_done_at = NOW()");
+        if ($stmt) {
+            $stmt->bind_param('ii', $studentId, $moduleId);
+            $stmt->execute();
+            $stmt->close();
+        }
+        
+        ob_end_clean(); // ✅ Clear buffer before redirect
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
+    }
+}
 
 // Resolve grade text → grade_levels.id
 $gradeId = null;
@@ -27,12 +50,20 @@ if ($gstmt) {
     $gstmt->close();
 }
 
-// Get modules
+// Get modules with progress status
 $result = null;
 if ($gradeId !== null) {
-    $stmt = $conn->prepare("SELECT id, title, file_path FROM modules WHERE grade_level_id = ?");
+    $stmt = $conn->prepare("
+        SELECT m.id, m.title, m.file_path, 
+               COALESCE(mp.status, 'not_started') as progress_status,
+               mp.marked_done_at
+        FROM modules m 
+        LEFT JOIN module_progress mp ON m.id = mp.module_id AND mp.student_id = ?
+        WHERE m.grade_level_id = ?
+        ORDER BY m.uploaded_at DESC
+    ");
     if ($stmt) {
-        $stmt->bind_param("i", $gradeId);
+        $stmt->bind_param("ii", $studentId, $gradeId);
         $stmt->execute();
         $result = $stmt->get_result();
     }
@@ -128,6 +159,8 @@ body {
     font-weight: 600;
     font-size: 14px;
     transition: background 0.2s;
+    border: none;
+    cursor: pointer;
 }
 
 .btn:hover {
@@ -143,10 +176,30 @@ body {
     background: #bfdbfe;
 }
 
+.btn.success {
+    background: #10b981;
+    color: white;
+}
+
+.btn.success:hover {
+    background: #059669;
+}
+
+.btn.disabled {
+    background: #9ca3af;
+    color: white;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn.disabled:hover {
+    background: #9ca3af;
+}
+
 /* ===== MODULE GRID ===== */
 .modules-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 20px;
     margin-bottom: 40px;
 }
@@ -158,6 +211,7 @@ body {
     border: 1px solid #e5e7eb;
     box-shadow: 0 2px 8px rgba(0,0,0,.06);
     transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
 }
 
 .module-card:hover {
@@ -165,17 +219,58 @@ body {
     box-shadow: 0 4px 12px rgba(0,0,0,.12);
 }
 
+.module-card.completed {
+    border-left: 4px solid #10b981;
+    background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+}
+
 .module-card strong {
     display: block;
     color: #1f2937;
     font-size: 16px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     line-height: 1.4;
+}
+
+.progress-status {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+}
+
+.progress-status.not-started {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.progress-status.reading {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.progress-status.completed {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.module-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.module-actions form {
+    margin: 0;
 }
 
 .module-card a {
     display: inline-block;
-    margin: 8px 8px 0 0;
+    margin: 0;
     padding: 8px 14px;
     background: #dbeafe;
     color: #1e40af;
@@ -184,20 +279,18 @@ body {
     font-weight: 600;
     text-decoration: none;
     transition: background 0.2s;
+    text-align: center;
 }
 
 .module-card a:hover {
     background: #bfdbfe;
 }
 
-.module-card a.btn {
-    background: #f59e0b;
-    color: white;
-    margin-top: 12px;
-}
-
-.module-card a.btn:hover {
-    background: #d97706;
+.completion-date {
+    font-size: 11px;
+    color: #059669;
+    margin-top: 8px;
+    font-style: italic;
 }
 
 .empty-state {
@@ -248,11 +341,36 @@ body {
     <?php if ($result->num_rows > 0): ?>
         <div class="modules-grid">
             <?php while($row = $result->fetch_assoc()): ?>
-                <div class="module-card">
+                <div class="module-card <?= $row['progress_status'] === 'completed' ? 'completed' : '' ?>">
                     <strong><?= htmlspecialchars($row['title']); ?></strong>
-                    <div>
+                    
+                    <div class="progress-status <?= $row['progress_status'] ?>">
+                        <?php if ($row['progress_status'] === 'not_started'): ?>
+                            📋 Not Started
+                        <?php elseif ($row['progress_status'] === 'reading'): ?>
+                            📖 Reading
+                        <?php else: ?>
+                            ✅ Completed
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="module-actions">
                         <a href="<?= htmlspecialchars($row['file_path']); ?>" target="_blank">📖 Read Module</a>
-                        <a class="btn" href="submit_activity.php?module_id=<?= $row['id'] ?>">📨 Submit Activity</a>
+                        
+                        <?php if ($row['progress_status'] !== 'completed'): ?>
+                            <form method="POST" style="margin: 0;">
+                                <input type="hidden" name="action" value="mark_done">
+                                <input type="hidden" name="module_id" value="<?= $row['id'] ?>">
+                                <button type="submit" class="btn success">✓ Mark as Done</button>
+                            </form>
+                        <?php else: ?>
+                            <a class="btn" href="submit_activity.php?module_id=<?= $row['id'] ?>">📨 Submit Activity</a>
+                            <?php if ($row['marked_done_at']): ?>
+                                <div class="completion-date">
+                                    Completed on <?= date('M j, Y \a\t g:i A', strtotime($row['marked_done_at'])) ?>
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php endwhile; ?>

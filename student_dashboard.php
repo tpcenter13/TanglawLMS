@@ -59,6 +59,29 @@ if ($gradeId !== null) {
     $modules = new class { public $num_rows = 0; public function fetch_assoc(){return false;} };
 }
 
+// Module progress statistics
+$completedCount = 0;
+$inProgressCount = 0;
+if ($gradeId !== null) {
+    $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM module_progress WHERE student_id = ? AND status = 'completed'");
+    if ($stmt) {
+        $stmt->bind_param("i", $studentId);
+        $stmt->execute();
+        $res = $stmt->get_result()->fetch_assoc();
+        $completedCount = $res['cnt'] ?? 0;
+        $stmt->close();
+    }
+
+    $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM module_progress WHERE student_id = ? AND status IN ('reading', 'completed')");
+    if ($stmt) {
+        $stmt->bind_param("i", $studentId);
+        $stmt->execute();
+        $res = $stmt->get_result()->fetch_assoc();
+        $inProgressCount = $res['cnt'] ?? 0;
+        $stmt->close();
+    }
+}
+
 // Submissions count and recent
 $submissionCount = 0;
 $recentSubmissions = [];
@@ -389,6 +412,15 @@ body {
                 <a href="submit_activity.php" class="button-action">Get Started →</a>
             <?php endif; ?>
         </div>
+    </div>
+
+    <div class="card">
+        <div class="kpi"><?= $completedCount ?></div>
+        <div class="label">✅ Completed Modules</div>
+    </div>
+    <div class="card">
+        <div class="kpi"><?= round($moduleCount > 0 ? ($completedCount / $moduleCount) * 100 : 0) ?>%</div>
+        <div class="label">📊 Progress</div>
     </div>
 
     <!-- Quick Overview -->
