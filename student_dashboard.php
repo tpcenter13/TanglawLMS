@@ -39,19 +39,21 @@ if ($resCheck && $resCheck->num_rows > 0) {
 // Modules count and list
 $moduleCount = 0;
 $modules = null;
-if ($gradeId !== null) {
-    $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM modules WHERE grade_level_id = ?");
+$studentSchool = $student['school'] ?? null;
+
+if ($gradeId !== null && $studentSchool !== null) {
+    $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM modules WHERE grade_level_id = ? AND school = ?");
     if ($stmt) {
-        $stmt->bind_param("i", $gradeId);
+        $stmt->bind_param("is", $gradeId, $studentSchool);
         $stmt->execute();
         $countRes = $stmt->get_result()->fetch_assoc();
         $moduleCount = $countRes['cnt'] ?? 0;
         $stmt->close();
     }
 
-    $stmt = $conn->prepare("SELECT id, title, file_path FROM modules WHERE grade_level_id = ? ORDER BY id DESC LIMIT 5");
+    $stmt = $conn->prepare("SELECT id, title, file_path FROM modules WHERE grade_level_id = ? AND school = ? ORDER BY id DESC LIMIT 5");
     if ($stmt) {
-        $stmt->bind_param("i", $gradeId);
+        $stmt->bind_param("is", $gradeId, $studentSchool);
         $stmt->execute();
         $modules = $stmt->get_result();
     }

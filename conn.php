@@ -4,7 +4,7 @@ error_reporting(E_ALL);
 
 $host = "localhost";        
 $user = "root";           
-$password = "";            
+$password = "root";            
 $database = "tanglaw_lms";
 $port = 3306; // ✅ add this
 

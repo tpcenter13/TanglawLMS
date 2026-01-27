@@ -50,20 +50,23 @@ if ($gstmt) {
     $gstmt->close();
 }
 
-// Get modules with progress status
+// Get student's school from session
+$studentSchool = $loggedUser['school'] ?? null;
+
+// Get modules with progress status - filtered by grade AND school
 $result = null;
-if ($gradeId !== null) {
+if ($gradeId !== null && $studentSchool !== null) {
     $stmt = $conn->prepare("
         SELECT m.id, m.title, m.file_path, 
                COALESCE(mp.status, 'not_started') as progress_status,
                mp.marked_done_at
         FROM modules m 
         LEFT JOIN module_progress mp ON m.id = mp.module_id AND mp.student_id = ?
-        WHERE m.grade_level_id = ?
+        WHERE m.grade_level_id = ? AND m.school = ?
         ORDER BY m.uploaded_at DESC
     ");
     if ($stmt) {
-        $stmt->bind_param("ii", $studentId, $gradeId);
+        $stmt->bind_param("iis", $studentId, $gradeId, $studentSchool);
         $stmt->execute();
         $result = $stmt->get_result();
     }

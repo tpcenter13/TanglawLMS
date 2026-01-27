@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
             
             elseif ($role == 'detainee') {
-                $stmt = $conn->prepare("SELECT d.id, d.name, d.grade_level, gl.id AS grade_level_id, d.password
+                $stmt = $conn->prepare("SELECT d.id, d.name, d.grade_level, d.school, gl.id AS grade_level_id, d.password
                     FROM detainees d
                     LEFT JOIN grade_levels gl ON gl.level = d.grade_level
                     WHERE d.id_number = ? AND d.archived = 0 LIMIT 1");
@@ -158,7 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 } else {
                     $stmt->bind_param("s", $username);
                     $stmt->execute();
-                    $stmt->bind_result($d_id, $d_name, $d_grade_level, $d_grade_level_id, $d_hash);
+                    $stmt->bind_result($d_id, $d_name, $d_grade_level, $d_school, $d_grade_level_id, $d_hash);
                     if ($stmt->fetch()) {
                         if (!empty($d_hash)) {
                             if (empty($password)) {
@@ -169,6 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     'name' => $d_name,
                                     'grade_level' => $d_grade_level,
                                     'grade_level_id' => $d_grade_level_id ? (int)$d_grade_level_id : null,
+                                    'school' => $d_school,
                                     'role' => 'detainee'
                                 ];
                                 $redirect_url = 'student_dashboard.php';
@@ -182,6 +183,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 'name' => $d_name,
                                 'grade_level' => $d_grade_level,
                                 'grade_level_id' => $d_grade_level_id ? (int)$d_grade_level_id : null,
+                                'school' => $d_school,
                                 'role' => 'detainee'
                             ];
                             $redirect_url = 'student_dashboard.php';

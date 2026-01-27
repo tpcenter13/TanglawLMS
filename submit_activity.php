@@ -118,10 +118,14 @@ if ($gstmt) {
     if ($gres && $gr = $gres->fetch_assoc()) { $gradeId = (int)$gr['id']; }
     $gstmt->close();
 }
-if ($gradeId !== null) {
-    $stmt = $conn->prepare("SELECT id, title FROM modules WHERE grade_level_id = ?");
+
+// Get student's school
+$studentSchool = $loggedUser['school'] ?? null;
+
+if ($gradeId !== null && $studentSchool !== null) {
+    $stmt = $conn->prepare("SELECT id, title FROM modules WHERE grade_level_id = ? AND school = ? ORDER BY title");
     if ($stmt) {
-        $stmt->bind_param("i", $gradeId);
+        $stmt->bind_param("is", $gradeId, $studentSchool);
         $stmt->execute();
         $modResult = $stmt->get_result();
         while ($m = $modResult->fetch_assoc()) { $modules[] = $m; }

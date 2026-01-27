@@ -32,9 +32,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 $subject_id = $_POST['subject_id'];
                 $grade_level_id = $_POST['grade_level_id'];
                 
+                // Get teacher's provider school name
+                $teacherStmt = $conn->prepare("SELECT t.provider_id, p.name as school FROM teachers t LEFT JOIN providers p ON t.provider_id = p.id WHERE t.id = ?");
+                $teacherStmt->bind_param("i", $teacher_id);
+                $teacherStmt->execute();
+                $teacherResult = $teacherStmt->get_result()->fetch_assoc();
+                $teacher_school = $teacherResult['school'] ?? null;
+                $teacherStmt->close();
+                
                 // Check for duplicate module
-                $checkStmt = $conn->prepare("SELECT id FROM modules WHERE title = ? AND subject_id = ? AND grade_level_id = ? AND teacher_id = ?");
-                $checkStmt->bind_param("siii", $title, $subject_id, $grade_level_id, $teacher_id);
+                $checkStmt = $conn->prepare("SELECT id FROM modules WHERE title = ? AND subject_id = ? AND grade_level_id = ?");
+                $checkStmt->bind_param("sii", $title, $subject_id, $grade_level_id);
                 $checkStmt->execute();
                 $existingModule = $checkStmt->get_result();
                 
@@ -43,23 +51,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     if (file_exists($filepath)) {
                         @unlink($filepath);
                     }
-                    $message = 'A module with this exact title, subject, and grade level already exists';
+                    $message = '❌ A module with this exact title, subject, and grade level already exists';
                     $checkStmt->close();
                 } else {
                     // Module doesn't exist - proceed with insertion
-                    $stmt = $conn->prepare("INSERT INTO modules (title, subject_id, grade_level_id, file_path, teacher_id) VALUES (?, ?, ?, ?, ?)");
-                    $stmt->bind_param("siisi", $title, $subject_id, $grade_level_id, $filepath, $teacher_id);
+                    $stmt = $conn->prepare("INSERT INTO modules (title, subject_id, grade_level_id, file_path, teacher_id, school) VALUES (?, ?, ?, ?, ?, ?)");
+                    $stmt->bind_param("siisis", $title, $subject_id, $grade_level_id, $filepath, $teacher_id, $teacher_school);
                     
                     if ($stmt->execute()) {
-                        $message = 'Module uploaded successfully';
+                        $message = '✅ Module uploaded successfully';
                     } else {
-                        $message = 'Error saving module';
+                        $message = '❌ Error saving module';
                     }
                     $stmt->close();
                     $checkStmt->close();
                 }
             } else {
-                $message = 'Error uploading file';
+                $message = '❌ Error uploading file';
             }
         }
     }

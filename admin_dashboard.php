@@ -928,9 +928,9 @@ $providers = getAllProviders($conn);
                         <label>School</label>
                         <select name="school" id="add_detainee_school">
                             <option value="">Select School</option>
-                            <option value="Marcelo">Marcelo</option>
-                            <option value="St. Martin">St. Martin</option>
-                            <option value="ALS">ALS</option>
+                            <option value="Marcelo Facility">Marcelo Facility</option>
+                            <option value="St. Martin Center">St. Martin Center</option>
+                            <option value="DepEd ALS Program">DepEd ALS Program</option>
                             <option value="Other">Other / Community</option>
                         </select>
                     </div>
@@ -1036,9 +1036,9 @@ $providers = getAllProviders($conn);
                         <label>School</label>
                         <select name="school" id="edit_detainee_school" onchange="setDetaineeGradeOptions(this.value, document.getElementById('edit_detainee_grade_level'))">
                             <option value="">Select School</option>
-                            <option value="Marcelo">Marcelo</option>
-                            <option value="St. Martin">St. Martin</option>
-                            <option value="ALS">ALS</option>
+                            <option value="Marcelo Facility">Marcelo Facility</option>
+                            <option value="St. Martin Center">St. Martin Center</option>
+                            <option value="DepEd ALS Program">DepEd ALS Program</option>
                             <option value="Other">Other / Community</option>
                         </select>
                     </div>
