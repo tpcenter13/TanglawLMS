@@ -111,23 +111,24 @@ foreach ($requests as $req) {
     <title>Password Reset Requests - Tanglaw LMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <style>
-        .admin-header {
-            background: linear-gradient(90deg, #003049 0%, #003049 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 0;
-            margin: 0 0 0 260px;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: calc(100% - 260px);
-            z-index: 300;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            height: 60px;
-        }
+.admin-header {
+    background: linear-gradient(90deg, #003049 0%, #003049 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 0;
+    margin: 0 0 0 260px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: calc(100% - 260px);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    height: 60px; /* header height */
+    box-sizing: border-box; /* ensures padding doesn’t break height */
+}
         
         body {
             overflow: hidden;
@@ -137,13 +138,25 @@ foreach ($requests as $req) {
             height: 100%;
         }
         
-        .main-content { 
-            margin-left: 260px;
-            padding-top: 80px;
-            padding-bottom: 60px;
-            height: 100vh;
-            overflow-y: auto;
-        }
+/* Ensure main content is not hidden behind fixed navbar */
+.main-content { 
+    margin-left: 280px; /* width of sidebar */
+    padding-top: 100px; /* height of admin-header + some spacing */
+    padding-bottom: 60px;
+    min-height: 100vh;
+    overflow-y: auto;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: #f8f9fa;
+}
+
+/* Optional: responsive adjustments */
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0; 
+        padding-top: 140px; /* navbar height + some spacing for mobile */
+        padding-bottom: 24px;
+    }
+}
         
         .main-content .container {
             max-width: 1400px;
@@ -499,7 +512,7 @@ foreach ($requests as $req) {
     <div></div>
 </header>
 
-<div class="main-content">
+<div class="main-content" style="padding-top: 100px;"> <!-- added extra top padding -->
     <div class="container">
         <?php if ($message): ?>
             <div class="alert <?= strpos($message, '✅') !== false ? 'alert-success' : 'alert-error' ?>">
