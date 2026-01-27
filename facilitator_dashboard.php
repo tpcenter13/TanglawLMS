@@ -425,7 +425,7 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
                 <table>
                     <thead>
                         <tr>
-                            <th><input type="checkbox" id="select-all" onchange="document.querySelectorAll('input[name=\"submission_ids[]\"]').forEach(el => el.checked = this.checked)"></th>
+                            <th><input type="checkbox" id="select-all" onchange="document.querySelectorAll('input[name=\"submission_ids[]\"]').forEach(el => </th>
                             <th>Detainee</th>
                             <th>Activity</th>
                             <th>Submitted</th>
