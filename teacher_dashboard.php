@@ -313,39 +313,57 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Teacher Dashboard - Tanglaw LMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <!-- Dashboard v1.1 - If styles don't update, clear browser cache: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac) -->
     <style>
         .teacher-header {
             background: linear-gradient(90deg, #059669 0%, #10b981 100%);
             color: white;
-            padding: 20px;
+            padding: 16px 24px;
             border-radius: 0;
-            margin: 0 0 0 260px;
-            width: calc(100% - 260px);
+            margin-left: 280px;
             position: fixed;
             top: 0;
             left: 0;
-            z-index: 300;
-               height: 50px;
+            right: 0;
+            z-index: 100;
+            height: auto;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
         .teacher-header .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .teacher-header h1 { margin: 0 0 8px 0; }
-        .teacher-header p { margin: 0; opacity: 0.95; }
-        .teacher-header a { color: white; text-decoration: none; }
+        .teacher-header h1 { 
+            margin: 0; 
+            font-size: 24px;
+            font-weight: 700;
+        }
+        .teacher-header p { 
+            margin: 0; 
+            opacity: 0.95;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        .teacher-header a { color: white; text-decoration: none; font-weight: 600; }
         .teacher-header a:hover { text-decoration: underline; }
+        
         .main-content { 
-            margin-left: 260px;
+            margin-left: 280px;
             margin-top: 0;
-            /* provide consistent top offset for fixed header */
-            padding-top: 100px;
+            padding-top: 120px !important;
+            min-height: 100vh;
         }
         .main-content .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 24px !important;
+        }
+        .section.active .grid {
+            margin-top: 20px;
         }
         .section-nav {
             display: flex;
@@ -408,15 +426,23 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
             border-radius: 6px;
         }
         button[type="submit"] {
-            background: var(--success);
-            color: white;
+            background: #10b981 !important;
+            color: white !important;
             padding: 10px 20px;
             border: none;
             border-radius: 6px;
             cursor: pointer;
             font-weight: 600;
+            transition: all 0.2s ease;
         }
-        button[type="submit"]:hover { background: #15803d; }
+        button[type="submit"]:hover { 
+            background: #059669 !important; 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        button[type="submit"]:active {
+            transform: translateY(0);
+        }
         .alert { padding: 12px; border-radius: 6px; margin-bottom: 15px; }
         .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
         .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
@@ -438,6 +464,31 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
         /* Activity modal shares styles but has its own id */
         #editActivityModal { position: fixed; left:0; top:0; width:100%; height:100%; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); z-index:400; }
         #editActivityModal .modal-content { background:white; padding:20px; border-radius:8px; width:95%; max-width:720px; box-shadow:0 6px 18px rgba(0,0,0,0.12); }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .teacher-header {
+                margin-left: 0;
+                padding: 12px 16px;
+            }
+            .teacher-header .container {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            .teacher-header h1 {
+                font-size: 20px;
+            }
+            .teacher-header p {
+                font-size: 13px;
+            }
+            .main-content {
+                margin-left: 0;
+                padding-top: 130px;
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+        }
     </style>
 </head>
 <body class="role-teacher">
@@ -448,7 +499,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
 <div class="teacher-header">
     <div class="container">
         <h1>Tanglaw Learn</h1>
-        <p>Welcome, <?= htmlspecialchars($_SESSION['loggedUser']['name']) ?> | <a href="logout.php" style="color:white;">Logout</a></p>
+        <p>Welcome, <?= htmlspecialchars($_SESSION['loggedUser']['name']) ?> | <a href="logout.php">Logout</a></p>
     </div>
 </div>
 
@@ -461,7 +512,6 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
     <?php endif; ?>
 
     <!-- DASHBOARD SECTION -->
-   <br> <br> <br> <br> <br>
     <div class="section <?= $section == 'dashboard' ? 'active' : '' ?>">
         <div class="grid">
             <div class="card">
@@ -485,7 +535,6 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
 
     <!-- UPLOAD MODULES SECTION -->
     <div class="section <?= $section == 'modules' ? 'active' : '' ?>">
-      <br> 
         <h2>📚 Upload Modules</h2>
         
         <div class="card">
@@ -819,9 +868,8 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
     </div>
 
 </div>
+</div>
 
-</body>
-</html>
 <script>
     function toggleSidebar() {
         var body = document.body;

@@ -66,48 +66,37 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!isset($_POST['action']) || $_POST['action'] !== 'forgot') {
         $username = trim($_POST['username'] ?? '');
         $password = trim($_POST['password'] ?? '');
-        $role = trim($_POST['role'] ?? '');
         
-        if (empty($username) || empty($role)) {
+        if (empty($username) || empty($password)) {
             $error = "❌ Please fill in all required fields.";
-        } elseif ($role === 'admin' && empty($password)) {
-            $error = "❌ Password is required for admin login.";
         } else {
             $redirect_url = '';
             $found_user = false;
             
-            if ($role == 'admin') {
-                if ($username === 'admin' && $password === 'admin123') {
-                    $_SESSION['loggedUser'] = [
-                        'id' => 0,
-                        'name' => 'Administrator',
-                        'role' => 'admin'
-                    ];
-                    $redirect_url = 'admin_dashboard.php';
-                    $found_user = true;
-                } else {
-                    $error = "❌ Invalid admin credentials.";
-                }
+            // Check if admin
+            if ($username === 'admin' && $password === 'admin123') {
+                $_SESSION['loggedUser'] = [
+                    'id' => 0,
+                    'name' => 'Administrator',
+                    'role' => 'admin'
+                ];
+                $redirect_url = 'admin_dashboard.php';
+                $found_user = true;
             }
             
-            elseif ($role == 'teacher') {
+            // Check if teacher
+            if (!$found_user) {
                 $stmt = $conn->prepare("SELECT id, name, password FROM teachers WHERE id_number = ? AND archived = 0 LIMIT 1");
-                if (!$stmt) {
-                    $error = "❌ Database error: " . $conn->error;
-                } else {
+                if ($stmt) {
                     $stmt->bind_param("s", $username);
                     $stmt->execute();
                     $stmt->bind_result($t_id, $t_name, $t_hash);
                     if ($stmt->fetch()) {
                         if (!empty($t_hash)) {
-                            if (empty($password)) {
-                                $error = '❌ Password is required.';
-                            } elseif (password_verify($password, $t_hash)) {
+                            if (password_verify($password, $t_hash)) {
                                 $_SESSION['loggedUser'] = [ 'id' => $t_id, 'name' => $t_name, 'role' => 'teacher' ];
                                 $redirect_url = 'teacher_dashboard.php';
                                 $found_user = true;
-                            } else {
-                                $error = '❌ Invalid credentials.';
                             }
                         } else {
                             $_SESSION['loggedUser'] = [ 'id' => $t_id, 'name' => $t_name, 'role' => 'teacher' ];
@@ -119,24 +108,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             }
             
-            elseif ($role == 'facilitator') {
+            // Check if facilitator
+            if (!$found_user) {
                 $stmt = $conn->prepare("SELECT id, name, password FROM facilitators WHERE id_number = ? AND archived = 0 LIMIT 1");
-                if (!$stmt) {
-                    $error = "❌ Database error: " . $conn->error;
-                } else {
+                if ($stmt) {
                     $stmt->bind_param("s", $username);
                     $stmt->execute();
                     $stmt->bind_result($f_id, $f_name, $f_hash);
                     if ($stmt->fetch()) {
                         if (!empty($f_hash)) {
-                            if (empty($password)) {
-                                $error = '❌ Password is required.';
-                            } elseif (password_verify($password, $f_hash)) {
+                            if (password_verify($password, $f_hash)) {
                                 $_SESSION['loggedUser'] = [ 'id' => $f_id, 'name' => $f_name, 'role' => 'facilitator' ];
                                 $redirect_url = 'facilitator_dashboard.php';
                                 $found_user = true;
-                            } else {
-                                $error = '❌ Invalid credentials.';
                             }
                         } else {
                             $_SESSION['loggedUser'] = [ 'id' => $f_id, 'name' => $f_name, 'role' => 'facilitator' ];
@@ -148,22 +132,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             }
             
-            elseif ($role == 'detainee') {
+            // Check if detainee
+            if (!$found_user) {
                 $stmt = $conn->prepare("SELECT d.id, d.name, d.grade_level, d.school, gl.id AS grade_level_id, d.password
                     FROM detainees d
                     LEFT JOIN grade_levels gl ON gl.level = d.grade_level
                     WHERE d.id_number = ? AND d.archived = 0 LIMIT 1");
-                if (!$stmt) {
-                    $error = "❌ Database error: " . $conn->error;
-                } else {
+                if ($stmt) {
                     $stmt->bind_param("s", $username);
                     $stmt->execute();
                     $stmt->bind_result($d_id, $d_name, $d_grade_level, $d_school, $d_grade_level_id, $d_hash);
                     if ($stmt->fetch()) {
                         if (!empty($d_hash)) {
-                            if (empty($password)) {
-                                $error = '❌ Password is required.';
-                            } elseif (password_verify($password, $d_hash)) {
+                            if (password_verify($password, $d_hash)) {
                                 $_SESSION['loggedUser'] = [
                                     'id' => $d_id,
                                     'name' => $d_name,
@@ -174,8 +155,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 ];
                                 $redirect_url = 'student_dashboard.php';
                                 $found_user = true;
-                            } else {
-                                $error = '❌ Invalid credentials.';
                             }
                         } else {
                             $_SESSION['loggedUser'] = [
@@ -198,10 +177,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $success = "✅ Login successful! Redirecting...";
                 header("refresh:1.5;url=$redirect_url");
             } else {
-                if (empty($error)) {
-                    $error = "❌ No " . htmlspecialchars($role) . " found with that ID number.";
-                }
-                error_log("Login failed for role={$role}, username={$username}");
+                $error = "❌ Invalid username or password.";
+                error_log("Login failed for username={$username}");
             }
         }
     }
@@ -701,18 +678,7 @@ $conn->close();
         
         <form method="POST">
             <div class="form-group">
-                <label for="role">I am a</label>
-                <select id="role" name="role" required onchange="updateInfo()">
-                    <option value="">Select your role</option>
-                    <option value="admin">👨‍💼 Administrator</option>
-                    <option value="teacher">👨‍🏫 Teacher</option>
-                    <option value="facilitator">👥 Facilitator</option>
-                    <option value="detainee">👨‍🎓 Student</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="username">ID Number / Username</label>
+                <label for="username">Username / ID Number <span class="required">*</span></label>
                 <div class="input-wrapper">
                     <span class="input-icon">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -720,11 +686,11 @@ $conn->close();
                             <circle cx="12" cy="7" r="4"/>
                         </svg>
                     </span>
-                    <input type="text" id="username" name="username" class="with-icon" placeholder="Enter your ID number" required>
+                    <input type="text" id="username" name="username" class="with-icon" placeholder="Enter your username or ID number" required autofocus>
                 </div>
             </div>
 
-            <div class="form-group" id="password-group" style="display: none;">
+            <div class="form-group">
                 <label for="password">Password <span class="required">*</span></label>
                 <div class="password-wrapper">
                     <div class="input-wrapper">
@@ -734,7 +700,7 @@ $conn->close();
                                 <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                             </svg>
                         </span>
-                        <input type="password" id="password" name="password" class="with-icon" placeholder="Enter your password">
+                        <input type="password" id="password" name="password" class="with-icon" placeholder="Enter your password" required>
                     </div>
                     <span class="password-toggle" onclick="togglePassword()">
                         <svg id="eyeIcon" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -801,19 +767,6 @@ $conn->close();
 </div>
 
 <script>
-function updateInfo() {
-    const role = document.getElementById('role').value;
-    const passwordGroup = document.getElementById('password-group');
-    const passwordInput = document.getElementById('password');
-
-    if (role === '') {
-        passwordGroup.style.display = 'none';
-        passwordInput.value = '';
-    } else {
-        passwordGroup.style.display = 'block';
-    }
-}
-
 function togglePassword() {
     const pwd = document.getElementById("password");
     const icon = document.getElementById("eyeIcon");
