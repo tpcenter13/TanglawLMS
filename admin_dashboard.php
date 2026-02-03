@@ -20,7 +20,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     // ====== TEACHER MANAGEMENT ======
     if ($action == 'edit_teacher') {
-        // Require id, id_number and name. Position/email/provider optional.
         if (empty($_POST['teacher_id']) || empty($_POST['id_number']) || empty($_POST['name'])) {
             $message = 'Please fill in all fields.';
         } else {
@@ -42,7 +41,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
    if ($action == 'add_teacher') {
-    // Form requires: id_number, name. Position/email/provider are optional.
     if (empty($_POST['id_number']) || empty($_POST['name'])) {
         $message = 'Please fill in all fields.';
     } else {
@@ -52,10 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $_POST['name'],
             $_POST['email'] ?? '',
             $_POST['position'] ?? '',
-            !empty($_POST['provider_id']) ? (int)$_POST['provider_id'] : null,  // provider_id
-            $_POST['level'] ?? null,                                             // level
-            null,                                                                 // profile_file
-            !empty($_POST['password']) ? $_POST['password'] : null               // adminPassword
+            !empty($_POST['provider_id']) ? (int)$_POST['provider_id'] : null,
+            $_POST['level'] ?? null,
+            null,
+            !empty($_POST['password']) ? $_POST['password'] : null
         );
         $message = $result['message'];
         $section = 'teachers';
@@ -73,7 +71,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     // ====== FACILITATOR MANAGEMENT ======
     if ($action == 'add_facilitator') {
-        // Form requires: id_number, name. Position/email/employment_status optional.
         if (empty($_POST['id_number']) || empty($_POST['name'])) {
             $message = 'Please fill in all fields.';
         } else {
@@ -83,7 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
     if ($action == 'edit_facilitator') {
-        // Require facilitator_id, id_number and name. Position/email/employment_status optional.
         if (empty($_POST['facilitator_id']) || empty($_POST['id_number']) || empty($_POST['name'])) {
             $message = 'Please fill in all fields.';
         } else {
@@ -131,7 +127,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     // ====== SUBJECT MANAGEMENT ======
     if ($action == 'add_subject') {
-        // Handle optional subject file upload
         $subject_file_path = null;
         if (!empty($_FILES['subject_file']['tmp_name'])) {
             $upload_dir = 'uploads/subjects/';
@@ -147,7 +142,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
     if ($action == 'edit_subject') {
-        // Handle optional subject file upload
         $subject_file_path = null;
         if (!empty($_FILES['subject_file']['tmp_name'])) {
             $upload_dir = 'uploads/subjects/';
@@ -200,13 +194,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     // ====== PASSWORD ACTIONS ======
-   
-
     if ($action == 'send_reset_email') {
         $role = $_POST['role'] ?? '';
         $user_id = intval($_POST['user_id'] ?? 0);
         if ($role && $user_id) {
-            // Load user email and name depending on role
             if ($role === 'teacher') {
                 $stmt = $conn->prepare("SELECT id_number, name, email FROM teachers WHERE id = ? LIMIT 1");
             } elseif ($role === 'facilitator') {
@@ -276,12 +267,12 @@ $providers = getAllProviders($conn);
             height: 100%;
         }
         .main-content { 
-    margin-left: 260px;
-    padding-top: 80px; /* header (60px) + breathing space */
-    padding-bottom: 60px;
-    height: 100vh;
-    overflow-y: auto;
-}
+            margin-left: 260px;
+            padding-top: 80px;
+            padding-bottom: 60px;
+            height: 100vh;
+            overflow-y: auto;
+        }
         .main-content .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -306,32 +297,28 @@ $providers = getAllProviders($conn);
             margin-right: auto;
         }
 
-        /* Keep cards a consistent width so centering looks good */
         .section.active .grid .card {
             width: 100%;
             max-width: 280px;
             margin: 0 auto;
         }
         
-        /* Responsive: 2 columns on medium screens */
         @media (max-width: 1200px) {
             .section.active .grid {
                 grid-template-columns: repeat(2, 1fr);
             }
         }
         
-        /* Responsive: 1 column on small screens */
         @media (max-width: 768px) {
             .section.active .grid {
                 grid-template-columns: 1fr;
             }
         }
 
-        /* Make dashboard cards scrollable without moving header */
         .section.dashboard-scrollable .grid-wrapper {
-            max-height: 60vh; /* adjust as needed */
+            max-height: 60vh;
             overflow-y: auto;
-            padding-right: 8px; /* space for scrollbar */
+            padding-right: 8px;
         }
         .section.active .grid .card {
             background: white;
@@ -388,6 +375,58 @@ $providers = getAllProviders($conn);
         .modal-close:hover { color: #000; }
         .modal h2 { margin-top: 0; }
         .action-buttons { white-space: nowrap; }
+
+        /* ===== NOTIFICATION MODAL ===== */
+        #notif_modal {
+            z-index: 2000;
+        }
+        #notif_modal .modal-content {
+            margin: 19% auto;
+            width: 380px;
+            max-width: 90%;
+            padding: 36px 28px 28px;
+            text-align: center;
+            border-radius: 14px;
+            position: relative;
+            animation: notifPop 0.25s ease;
+        }
+        @keyframes notifPop {
+            0%   { transform: scale(0.85); opacity: 0; }
+            100% { transform: scale(1);    opacity: 1; }
+        }
+        #notif_modal .notif-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 16px;
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            background: none;
+            border: none;
+            line-height: 1;
+        }
+        #notif_modal .notif-close-btn:hover { color: #333; }
+        #notif_modal .notif-icon  { font-size: 42px; margin-bottom: 8px; }
+        #notif_modal .notif-text  { margin: 0; font-size: 16px; font-weight: 600; }
+
+        /* progress bar at the bottom of the card */
+        #notif_modal .notif-bar-wrap {
+            margin-top: 18px;
+            height: 4px;
+            background: rgba(0,0,0,0.08);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        #notif_modal .notif-bar {
+            height: 100%;
+            width: 100%;
+            border-radius: 2px;
+            animation: notifDrain 3s linear forwards;
+        }
+        @keyframes notifDrain {
+            0%   { width: 100%; }
+            100% { width: 0%; }
+        }
     </style>
     <script>
         function openModal(modalId) {
@@ -397,7 +436,7 @@ $providers = getAllProviders($conn);
             document.getElementById(modalId).classList.remove('show');
         }
         window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) {
+            if (event.target.classList.contains('modal') && event.target.id !== 'notif_modal') {
                 event.target.classList.remove('show');
             }
         }
@@ -427,7 +466,6 @@ $providers = getAllProviders($conn);
                 document.getElementById('edit_detainee_id_number').value = data.id_number;
                 document.getElementById('edit_detainee_name').value = data.name;
                 document.getElementById('edit_detainee_email').value = data.email;
-                // set school first if available, then populate grade options and select grade
                 if (document.getElementById('edit_detainee_school')) {
                     document.getElementById('edit_detainee_school').value = data.school || '';
                 }
@@ -454,6 +492,42 @@ $providers = getAllProviders($conn);
                 document.getElementById('edit_provider_type').value = data.provider_type;
             }
         }
+
+        /* ===== show the notification modal ===== */
+        function showNotifModal(message) {
+            var isSuccess  = message.indexOf('✅') !== -1;
+            var modal      = document.getElementById('notif_modal');
+            var card       = modal.querySelector('.modal-content');
+            var icon       = modal.querySelector('.notif-icon');
+            var text       = modal.querySelector('.notif-text');
+            var bar        = modal.querySelector('.notif-bar');
+
+            // colours
+            if (isSuccess) {
+                card.style.background = '#dcfce7';
+                card.style.border    = '1px solid #bbf7d0';
+                text.style.color     = '#166534';
+                bar.style.background = '#22c55e';
+            } else {
+                card.style.background = '#fee2e2';
+                card.style.border    = '1px solid #fecaca';
+                text.style.color     = '#991b1b';
+                bar.style.background = '#ef4444';
+            }
+
+            icon.textContent = isSuccess ? '✅' : '❌';
+            text.textContent = message;
+
+            // restart progress-bar animation
+            bar.style.animation = 'none';
+            void bar.offsetWidth; // force reflow
+            bar.style.animation = 'notifDrain 3s linear forwards';
+
+            modal.style.display = 'block';
+
+            // auto-close after 3 s
+            setTimeout(function(){ modal.style.display = 'none'; }, 3000);
+        }
     </script>
     <script>
         // Build grade arrays from PHP-provided grade levels
@@ -469,14 +543,12 @@ $providers = getAllProviders($conn);
     var allowed = [];
 
     if (val.includes('marcelo') || val.includes('st') || val.includes('st. martin') || val.includes('st martin')) {
-        // Senior High only
         allowed = allGrades.filter(g => 
             ['Grade 11', 'Grade 12', 'grade 11', 'grade 12']
                 .some(pattern => g.toLowerCase() === pattern)
         );
     } 
     else if (val.includes('als')) {
-        // Junior High / ALS → Grades 7–10 only
         allowed = allGrades.filter(g => 
             ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 
              'grade 7', 'grade 8', 'grade 9', 'grade 10']
@@ -484,11 +556,9 @@ $providers = getAllProviders($conn);
         );
     } 
     else {
-        // Other / Community → show everything
         allowed = allGrades.slice();
     }
 
-    // Rebuild dropdown
     selectEl.innerHTML = '';
 
     const placeholder = document.createElement('option');
@@ -496,7 +566,6 @@ $providers = getAllProviders($conn);
     placeholder.textContent = 'Select Grade Level';
     selectEl.appendChild(placeholder);
 
-    // Sort numerically if you want clean order (7 → 8 → 9 → 10 → 11 → 12)
     allowed.sort((a, b) => {
         const numA = parseInt(a.replace(/\D/g, '')) || 0;
         const numB = parseInt(b.replace(/\D/g, '')) || 0;
@@ -511,13 +580,11 @@ $providers = getAllProviders($conn);
     });
 }
 
-        // Wire up add form school change
         document.addEventListener('DOMContentLoaded', function(){
             var addSchool = document.getElementById('add_detainee_school');
             var addGrade = document.getElementById('add_detainee_grade_level');
             if (addSchool && addGrade) {
                 addSchool.addEventListener('change', function(){ setDetaineeGradeOptions(this.value, addGrade); });
-                // initialize to current selection
                 setDetaineeGradeOptions(addSchool.value, addGrade);
             }
         });
@@ -528,20 +595,16 @@ $providers = getAllProviders($conn);
             var body = document.body;
             var backdrop = document.getElementById('sidebarBackdrop');
             if (window.innerWidth <= 900) {
-                // mobile: toggle overlay
                 if (body.classList.contains('sidebar-open')) {
                     body.classList.remove('sidebar-open');
                 } else {
                     body.classList.add('sidebar-open');
                 }
             } else {
-                // desktop: collapse/expand
                 body.classList.toggle('sidebar-collapsed');
             }
-            // update backdrop visibility (for noscript fallback)
             if (backdrop) backdrop.style.display = body.classList.contains('sidebar-open') ? 'block' : 'none';
         }
-        // Ensure initial state: not collapsed
         document.addEventListener('DOMContentLoaded', function(){
             document.body.classList.remove('sidebar-open');
             document.body.classList.remove('sidebar-collapsed');
@@ -561,12 +624,26 @@ $providers = getAllProviders($conn);
 </header>
 
 <div class="main-content">
-    <?php if ($message): ?>
-        <div class="alert <?= strpos($message, '✅') !== false ? 'alert-success' : 'alert-error' ?>">
-            <?= htmlspecialchars($message) ?>
+
+    <!-- ===== NOTIFICATION MODAL (replaces the old top alert) ===== -->
+    <div id="notif_modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <button class="notif-close-btn" onclick="document.getElementById('notif_modal').style.display='none'">&times;</button>
+            <div class="notif-icon">✅</div>
+            <p  class="notif-text"></p>
+            <div class="notif-bar-wrap"><div class="notif-bar"></div></div>
         </div>
+    </div>
+
+    <!-- fire the modal if PHP set $message -->
+    <?php if ($message): ?>
+    <script>
+        document.addEventListener('DOMContentLoaded', function(){
+            showNotifModal(<?= json_encode($message) ?>);
+        });
+    </script>
     <?php endif; ?>
-    
+
     <!-- DASHBOARD SECTION -->
    <br> <br> <br>
     <div class="section <?= $section == 'dashboard' ? 'active' : '' ?>">
@@ -649,17 +726,15 @@ $providers = getAllProviders($conn);
                         </select>
                     </div>
                 </div>
-<div class="form-row full">
-    <div class="form-group">
-        <label>Password </label>
-        <input type="password" name="password" placeholder="Enter password ">
-    </div>
-</div>
+                <div class="form-row full">
+                    <div class="form-group">
+                        <label>Password </label>
+                        <input type="password" name="password" placeholder="Enter password ">
+                    </div>
+                </div>
                 <button type="submit">Add Teacher</button>
             </form>
         </div>
-
-    
 
         <table>
             <thead>
@@ -801,13 +876,12 @@ $providers = getAllProviders($conn);
                         </select>
                     </div>
                 </div>
-
-<div class="form-row full">
-    <div class="form-group">
-        <label>Password </label>
-        <input type="password" name="password" placeholder="Enter password ">
-    </div>
-</div>
+                <div class="form-row full">
+                    <div class="form-group">
+                        <label>Password </label>
+                        <input type="password" name="password" placeholder="Enter password ">
+                    </div>
+                </div>
                 <button type="submit">Add Facilitator</button>
             </form>
         </div>
@@ -946,20 +1020,18 @@ $providers = getAllProviders($conn);
                         </select>
                     </div>
                 </div>
-
-<div class="form-row full">
-    <div class="form-group">
-        <label>Password </label>
-        <input type="password" name="password" placeholder="Enter password ">
-    </div>
-</div>
+                <div class="form-row full">
+                    <div class="form-group">
+                        <label>Password </label>
+                        <input type="password" name="password" placeholder="Enter password ">
+                    </div>
+                </div>
                 <button type="submit">Add Student</button>
             </form>
         </div>
 
 
         <?php
-            // Group detainees by school for clearer organization
             $detaineeGroups = [];
             foreach ($detainees as $det) {
                 $school = trim((string)($det['school'] ?? ''));
@@ -1011,7 +1083,7 @@ $providers = getAllProviders($conn);
     <div id="edit_detainee_modal" class="modal">
         <div class="modal-content">
             <span class="modal-close" onclick="closeModal('edit_detainee_modal')">&times;</span>
-            <h2>EditStudent</h2>
+            <h2>Edit Student</h2>
             <form method="POST">
                 <input type="hidden" name="action" value="edit_detainee">
                 <input type="hidden" name="detainee_id" id="edit_detainee_id">
@@ -1353,19 +1425,17 @@ console.log('✅ EmailJS initialized');
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🔍 Looking for reset forms...');
     
-    // Find ALL forms on the page
     const allForms = document.querySelectorAll('form');
     console.log('Found', allForms.length, 'forms total');
     
     allForms.forEach((form, index) => {
-        // Check if this form has send_reset_email action
         const actionInput = form.querySelector('input[name="action"][value="send_reset_email"]');
         
         if (actionInput) {
             console.log('✅ Found reset form #' + index);
             
             form.addEventListener('submit', function(e) {
-                e.preventDefault(); // Stop default submission
+                e.preventDefault();
                 e.stopPropagation();
                 
                 console.log('🚀 Reset form submitted!');
@@ -1378,13 +1448,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('Role:', role);
                 console.log('User ID:', userId);
                 
-                // Show loading state
                 const submitButton = this.querySelector('button[type="submit"]');
                 const originalText = submitButton.innerHTML;
                 submitButton.disabled = true;
                 submitButton.innerHTML = '⏳ Sending...';
                 
-                // Make AJAX call to PHP to generate token and get user data
                 fetch('admin_reset_handler.php', {
                     method: 'POST',
                     headers: {
@@ -1400,12 +1468,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('📦 PHP Response:', data);
                     
                     if (data.success) {
-                        // Build reset link
                         const resetLink = window.location.origin + 
                                         window.location.pathname.replace('admin_dashboard.php', 'reset_password.php') + 
                                         '?token=' + data.token;
                         
-                        // Send email via EmailJS
                         const templateParams = {
                             to_email: data.email,
                             name: data.name,
@@ -1427,13 +1493,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log('✅ EmailJS SUCCESS!', response);
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalText;
-                    alert('✅ Password reset email sent successfully!');
+                    showNotifModal('✅ Password reset email sent successfully!');
                 })
                 .catch(error => {
                     console.error('❌ Error:', error);
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalText;
-                    alert('❌ Failed to send reset email: ' + error.message);
+                    showNotifModal('❌ Failed to send reset email: ' + error.message);
                 });
                 
                 return false;
