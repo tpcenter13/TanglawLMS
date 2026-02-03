@@ -21,7 +21,7 @@ $studentId = $loggedUser['id'];
 // If the submissions table doesn't exist yet, avoid fatal error and show empty result
 $resCheck = $conn->query("SHOW TABLES LIKE 'activity_submissions'");
 if ($resCheck && $resCheck->num_rows > 0) {
-    $stmt = $conn->prepare("SELECT a.id, a.module_id, a.file_path, a.comments, a.status, a.submitted_at, m.title AS module_title
+    $stmt = $conn->prepare("SELECT a.id, a.module_id, a.file_path, a.comments, a.status, a.grade, a.submitted_at, m.title AS module_title
     FROM activity_submissions a
     LEFT JOIN modules m ON m.id = a.module_id
     WHERE a.student_id = ?
@@ -214,6 +214,7 @@ body {
                         <th>File</th>
                         <th>Comments</th>
                         <th>Status</th>
+                        <th>Grade</th>
                         <th>Submitted At</th>
                     </tr>
                 </thead>
@@ -224,6 +225,7 @@ body {
                             <td><a href="<?php echo htmlspecialchars($r['file_path']); ?>" target="_blank">📄 View File</a></td>
                             <td><?php echo nl2br(htmlspecialchars($r['comments'])); ?></td>
                             <td><span class="status-<?php echo htmlspecialchars($r['status']); ?>"><?php echo htmlspecialchars(ucfirst($r['status'])); ?></span></td>
+                            <td><?php echo htmlspecialchars($r['grade'] ?? '-'); ?></td>
                             <td><?php echo htmlspecialchars($r['submitted_at']); ?></td>
                         </tr>
                     <?php endwhile; ?>
