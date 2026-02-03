@@ -10,12 +10,11 @@ if (!isset($_SESSION['loggedUser'])) {
     exit();
 }
 
-$loggedUser = $_SESSION['loggedUser']; // IMPORTANT FIX
+$loggedUser = $_SESSION['loggedUser'];
 
 echo '<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>';
 include 'sidebar.php';
 
-// Now safe to use $loggedUser
 $studentId = $loggedUser['id'];
 
 // Accept module_id as GET parameter
@@ -23,6 +22,8 @@ $moduleId = isset($_GET['module_id']) ? intval($_GET['module_id']) : 0;
 
 // Get module info for display
 $moduleTitle = '';
+$moduleAlreadyGraded = false;
+
 if ($moduleId > 0) {
     $stmt = $conn->prepare("SELECT id, title FROM modules WHERE id = ?");
     $stmt->bind_param("i", $moduleId);
@@ -31,6 +32,15 @@ if ($moduleId > 0) {
     if ($modRes->num_rows > 0) {
         $row = $modRes->fetch_assoc();
         $moduleTitle = $row['title'];
+    }
+    
+    // Check if student already has a GRADED submission for this module
+    $gradeCheckStmt = $conn->prepare("SELECT id FROM activity_submissions WHERE student_id = ? AND module_id = ? AND status = 'graded' LIMIT 1");
+    $gradeCheckStmt->bind_param("ii", $studentId, $moduleId);
+    $gradeCheckStmt->execute();
+    $gradeCheckRes = $gradeCheckStmt->get_result();
+    if ($gradeCheckRes->num_rows > 0) {
+        $moduleAlreadyGraded = true;
     }
 }
 
@@ -42,65 +52,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $mId = intval($_POST['module_id']);
     $comments = isset($_POST['comments']) ? trim($_POST['comments']) : '';
 
-    if (!isset($_FILES['activity_sheet'])) {
-        $errors[] = 'No file uploaded.';
+    // CHECK: Prevent submission if module already has graded submission
+    $gradeCheckStmt = $conn->prepare("SELECT id FROM activity_submissions WHERE student_id = ? AND module_id = ? AND status = 'graded' LIMIT 1");
+    $gradeCheckStmt->bind_param("ii", $studentId, $mId);
+    $gradeCheckStmt->execute();
+    $gradeCheckRes = $gradeCheckStmt->get_result();
+    
+    if ($gradeCheckRes->num_rows > 0) {
+        $errors[] = 'You cannot submit another activity for this module because it has already been graded.';
     } else {
-        $file = $_FILES['activity_sheet'];
-        if ($file['error'] !== UPLOAD_ERR_OK) {
-            $errors[] = 'File upload error.';
+        if (!isset($_FILES['activity_sheet'])) {
+            $errors[] = 'No file uploaded.';
         } else {
-            // Validate size (max 10MB)
-            if ($file['size'] > 10 * 1024 * 1024) {
-                $errors[] = 'File too large (max 10 MB).';
-            }
-
-            // Validate type
-            $allowed = ['application/pdf', 'image/png', 'image/jpeg', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-            $finfo = finfo_open(FILEINFO_MIME_TYPE);
-            $mime = finfo_file($finfo, $file['tmp_name']);
-            finfo_close($finfo);
-
-            if (!in_array($mime, $allowed)) {
-                $errors[] = 'File type not allowed. Use PDF, DOC, DOCX, JPG, PNG.';
-            }
-
-            if (empty($errors)) {
-                $uploadDir = __DIR__ . '/uploads/activity_sheets/';
-                if (!is_dir($uploadDir)) {
-                    mkdir($uploadDir, 0755, true);
+            $file = $_FILES['activity_sheet'];
+            if ($file['error'] !== UPLOAD_ERR_OK) {
+                $errors[] = 'File upload error.';
+            } else {
+                // Validate size (max 10MB)
+                if ($file['size'] > 10 * 1024 * 1024) {
+                    $errors[] = 'File too large (max 10 MB).';
                 }
 
-                $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-                $baseName = pathinfo($file['name'], PATHINFO_FILENAME);
-                $newName = $studentId . '_' . $mId . '_' . time() . '_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $baseName) . '.' . $ext;
+                // Validate type
+                $allowed = ['application/pdf', 'image/png', 'image/jpeg', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $mime = finfo_file($finfo, $file['tmp_name']);
+                finfo_close($finfo);
 
-                $dest = $uploadDir . $newName;
+                if (!in_array($mime, $allowed)) {
+                    $errors[] = 'File type not allowed. Use PDF, DOC, DOCX, JPG, PNG.';
+                }
 
-                if (move_uploaded_file($file['tmp_name'], $dest)) {
-                    // Save metadata in DB (create table if not exists)
-                    $createSql = "CREATE TABLE IF NOT EXISTS activity_submissions (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        student_id INT NOT NULL,
-                        module_id INT NOT NULL,
-                        file_path VARCHAR(255) NOT NULL,
-                        comments TEXT,
-                        status VARCHAR(50) DEFAULT 'submitted',
-                        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-                    $conn->query($createSql);
-
-                    $relPath = 'uploads/activity_sheets/' . $newName;
-                    $insStmt = $conn->prepare("INSERT INTO activity_submissions (student_id, module_id, file_path, comments) VALUES (?, ?, ?, ?)");
-                    $insStmt->bind_param("iiss", $studentId, $mId, $relPath, $comments);
-                    $ok = $insStmt->execute();
-
-                    if ($ok) {
-                        $success = 'Activity sheet submitted successfully and sent to Tanglaw Facilitator.';
-                    } else {
-                        $errors[] = 'Failed to record submission: ' . $conn->error;
+                if (empty($errors)) {
+                    $uploadDir = __DIR__ . '/uploads/activity_sheets/';
+                    if (!is_dir($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
                     }
-                } else {
-                    $errors[] = 'Failed to move uploaded file.';
+
+                    $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+                    $baseName = pathinfo($file['name'], PATHINFO_FILENAME);
+                    $newName = $studentId . '_' . $mId . '_' . time() . '_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $baseName) . '.' . $ext;
+
+                    $dest = $uploadDir . $newName;
+
+                    if (move_uploaded_file($file['tmp_name'], $dest)) {
+                        // Save metadata in DB (create table if not exists)
+                        $createSql = "CREATE TABLE IF NOT EXISTS activity_submissions (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            student_id INT NOT NULL,
+                            module_id INT NOT NULL,
+                            file_path VARCHAR(255) NOT NULL,
+                            comments TEXT,
+                            status VARCHAR(50) DEFAULT 'submitted',
+                            grade DECIMAL(5,2) DEFAULT NULL,
+                            submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
+                        $conn->query($createSql);
+
+                        $relPath = 'uploads/activity_sheets/' . $newName;
+                        $insStmt = $conn->prepare("INSERT INTO activity_submissions (student_id, module_id, file_path, comments) VALUES (?, ?, ?, ?)");
+                        $insStmt->bind_param("iiss", $studentId, $mId, $relPath, $comments);
+                        $ok = $insStmt->execute();
+
+                        if ($ok) {
+                            $success = 'Activity sheet submitted successfully and sent to Tanglaw Facilitator.';
+                        } else {
+                            $errors[] = 'Failed to record submission: ' . $conn->error;
+                        }
+                    } else {
+                        $errors[] = 'Failed to move uploaded file.';
+                    }
                 }
             }
         }
@@ -213,6 +234,41 @@ body {
     margin-bottom: 0;
 }
 
+.alert-warning {
+    background: #fef3c7;
+    border: 1px solid #fde047;
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    color: #92400e;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.alert-warning.hidden {
+    display: none;
+}
+
+.btn-ok {
+    padding: 8px 20px;
+    background: #f59e0b;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+}
+
+.btn-ok:hover {
+    background: #d97706;
+}
+
 /* ===== FORM CARD ===== */
 .form-card {
     background: #fff;
@@ -276,6 +332,11 @@ body {
     background: #d97706;
 }
 
+.btn-submit:disabled {
+    background: #d1d5db;
+    cursor: not-allowed;
+}
+
 .back-link {
     display: inline-block;
     margin-top: 16px;
@@ -330,10 +391,17 @@ body {
         </div>
     <?php endif; ?>
 
+    <?php if ($moduleAlreadyGraded): ?>
+        <div class="alert-warning" id="gradedWarning">
+            <span>⚠️ This module has already been graded. You cannot submit another activity for this module.</span>
+            <button type="button" class="btn-ok" onclick="dismissWarning()">OK</button>
+        </div>
+    <?php endif; ?>
+
     <form method="POST" enctype="multipart/form-data" class="form-card">
         
         <label for="module_id">Select Module</label>
-        <select name="module_id" id="module_id" required>
+        <select name="module_id" id="module_id" required <?php echo $moduleAlreadyGraded ? 'disabled' : ''; ?>>
             <option value="">-- Choose a module --</option>
             <?php foreach ($modules as $m): ?>
                 <option value="<?php echo $m['id']; ?>" <?php echo ($m['id'] == $moduleId) ? 'selected' : ''; ?>>
@@ -343,12 +411,12 @@ body {
         </select>
 
         <label for="activity_sheet">Attach Activity Sheet (PDF, DOC, DOCX, JPG, PNG)</label>
-        <input type="file" name="activity_sheet" id="activity_sheet" accept=".pdf, .doc, .docx, .jpg, .jpeg, .png" required>
+        <input type="file" name="activity_sheet" id="activity_sheet" accept=".pdf, .doc, .docx, .jpg, .jpeg, .png" required <?php echo $moduleAlreadyGraded ? 'disabled' : ''; ?>>
 
         <label for="comments">Comments (optional)</label>
-        <textarea name="comments" id="comments" placeholder="Add any notes or comments about your submission..."></textarea>
+        <textarea name="comments" id="comments" placeholder="Add any notes or comments about your submission..." <?php echo $moduleAlreadyGraded ? 'disabled' : ''; ?>></textarea>
 
-        <button type="submit" class="btn-submit">📤 Submit to Tanglaw Facilitator</button>
+        <button type="submit" class="btn-submit" <?php echo $moduleAlreadyGraded ? 'disabled' : ''; ?>>📤 Submit to Tanglaw Facilitator</button>
     </form>
 
     <a href="student_modules.php" class="back-link">← Back to Modules</a>
@@ -371,9 +439,44 @@ function toggleSidebar() {
     }
 }
 
+function dismissWarning() {
+    const warning = document.getElementById('gradedWarning');
+    if (warning) {
+        warning.classList.add('hidden');
+        // Re-enable the form
+        enableForm();
+    }
+}
+
+function enableForm() {
+    const moduleSelect = document.getElementById('module_id');
+    const fileInput = document.getElementById('activity_sheet');
+    const commentsTextarea = document.getElementById('comments');
+    const submitButton = document.querySelector('.btn-submit');
+    
+    if (moduleSelect) moduleSelect.disabled = false;
+    if (fileInput) fileInput.disabled = false;
+    if (commentsTextarea) commentsTextarea.disabled = false;
+    if (submitButton) submitButton.disabled = false;
+    
+    // Reset the module selection
+    if (moduleSelect) moduleSelect.value = '';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     document.body.classList.remove('sidebar-open');
     document.body.classList.remove('sidebar-collapsed');
+    
+    // Check if module is selected and already graded
+    const moduleSelect = document.getElementById('module_id');
+    if (moduleSelect) {
+        moduleSelect.addEventListener('change', function() {
+            if (this.value) {
+                // Redirect to same page with module_id parameter to check grade status
+                window.location.href = 'submit_activity.php?module_id=' + this.value;
+            }
+        });
+    }
 });
 </script>
 

@@ -35,6 +35,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: " . $_SERVER['PHP_SELF']);
         exit();
     }
+    
+    if ($action === 'mark_incomplete') {
+        $moduleId = intval($_POST['module_id'] ?? 0);
+        
+        // Update progress to not_started
+        $stmt = $conn->prepare("UPDATE module_progress SET status = 'not_started', marked_done_at = NULL WHERE student_id = ? AND module_id = ?");
+        if ($stmt) {
+            $stmt->bind_param('ii', $studentId, $moduleId);
+            $stmt->execute();
+            $stmt->close();
+        }
+        
+        ob_end_clean();
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit();
+    }
 }
 
 // Resolve grade text → grade_levels.id
@@ -53,20 +69,24 @@ if ($gstmt) {
 // Get student's school from session
 $studentSchool = $loggedUser['school'] ?? null;
 
-// Get modules with progress status - filtered by grade AND school
+// Get modules with progress status AND submission status - filtered by grade AND school
 $result = null;
 if ($gradeId !== null && $studentSchool !== null) {
     $stmt = $conn->prepare("
         SELECT m.id, m.title, m.file_path, 
                COALESCE(mp.status, 'not_started') as progress_status,
-               mp.marked_done_at
+               mp.marked_done_at,
+               asub.status as submission_status,
+               asub.grade as submission_grade
         FROM modules m 
         LEFT JOIN module_progress mp ON m.id = mp.module_id AND mp.student_id = ?
+        LEFT JOIN activity_submissions asub ON m.id = asub.module_id AND asub.student_id = ?
         WHERE m.grade_level_id = ? AND m.school = ?
+        GROUP BY m.id
         ORDER BY m.uploaded_at DESC
     ");
     if ($stmt) {
-        $stmt->bind_param("iis", $studentId, $gradeId, $studentSchool);
+        $stmt->bind_param("iiis", $studentId, $studentId, $gradeId, $studentSchool);
         $stmt->execute();
         $result = $stmt->get_result();
     }
@@ -188,6 +208,15 @@ body {
     background: #059669;
 }
 
+.btn.warning {
+    background: #f59e0b;
+    color: white;
+}
+
+.btn.warning:hover {
+    background: #d97706;
+}
+
 .btn.disabled {
     background: #9ca3af;
     color: white;
@@ -227,6 +256,11 @@ body {
     background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
 }
 
+.module-card.graded {
+    border-left: 4px solid #8b5cf6;
+    background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%);
+}
+
 .module-card strong {
     display: block;
     color: #1f2937;
@@ -258,6 +292,11 @@ body {
 .progress-status.completed {
     background: #d1fae5;
     color: #065f46;
+}
+
+.progress-status.graded {
+    background: #ede9fe;
+    color: #6b21a8;
 }
 
 .module-actions {
@@ -294,6 +333,16 @@ body {
     color: #059669;
     margin-top: 8px;
     font-style: italic;
+}
+
+.graded-info {
+    font-size: 12px;
+    color: #6b21a8;
+    margin-top: 8px;
+    font-weight: 600;
+    background: #ede9fe;
+    padding: 8px 12px;
+    border-radius: 6px;
 }
 
 .empty-state {
@@ -343,35 +392,61 @@ body {
 
     <?php if ($result->num_rows > 0): ?>
         <div class="modules-grid">
-            <?php while($row = $result->fetch_assoc()): ?>
-                <div class="module-card <?= $row['progress_status'] === 'completed' ? 'completed' : '' ?>">
+            <?php while($row = $result->fetch_assoc()): 
+                $isGraded = ($row['submission_status'] === 'graded');
+                $hasSubmission = !empty($row['submission_status']);
+            ?>
+                <div class="module-card <?= $isGraded ? 'graded' : ($row['progress_status'] === 'completed' ? 'completed' : '') ?>">
                     <strong><?= htmlspecialchars($row['title']); ?></strong>
                     
-                    <div class="progress-status <?= $row['progress_status'] ?>">
-                        <?php if ($row['progress_status'] === 'not_started'): ?>
-                            📋 Not Started
-                        <?php elseif ($row['progress_status'] === 'reading'): ?>
-                            📖 Reading
-                        <?php else: ?>
-                            ✅ Completed
-                        <?php endif; ?>
-                    </div>
+                    <?php if ($isGraded): ?>
+                        <div class="progress-status graded">
+                            🎓 Graded
+                        </div>
+                    <?php else: ?>
+                        <div class="progress-status <?= $row['progress_status'] ?>">
+                            <?php if ($row['progress_status'] === 'not_started'): ?>
+                                📋 Not Started
+                            <?php elseif ($row['progress_status'] === 'reading'): ?>
+                                📖 Reading
+                            <?php else: ?>
+                                ✅ Completed
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
 
                     <div class="module-actions">
                         <a href="<?= htmlspecialchars($row['file_path']); ?>" target="_blank">📖 Read Module</a>
                         
-                        <?php if ($row['progress_status'] !== 'completed'): ?>
-                            <form method="POST" style="margin: 0;">
-                                <input type="hidden" name="action" value="mark_done">
-                                <input type="hidden" name="module_id" value="<?= $row['id'] ?>">
-                                <button type="submit" class="btn success">✓ Mark as Done</button>
-                            </form>
+                        <?php if ($isGraded): ?>
+                            <!-- Module is graded - show grade info, hide all action buttons -->
+                            <div class="graded-info">
+                                ✅ Grade: <?= htmlspecialchars($row['submission_grade'] ?? 'N/A') ?>
+                            </div>
                         <?php else: ?>
-                            <a class="btn" href="submit_activity.php?module_id=<?= $row['id'] ?>">📨 Submit Activity</a>
-                            <?php if ($row['marked_done_at']): ?>
-                                <div class="completion-date">
-                                    Completed on <?= date('M j, Y \a\t g:i A', strtotime($row['marked_done_at'])) ?>
-                                </div>
+                            <!-- Module is NOT graded yet -->
+                            <?php if ($row['progress_status'] !== 'completed'): ?>
+                                <!-- Not marked as complete - show Mark as Done button -->
+                                <form method="POST" style="margin: 0;">
+                                    <input type="hidden" name="action" value="mark_done">
+                                    <input type="hidden" name="module_id" value="<?= $row['id'] ?>">
+                                    <button type="submit" class="btn success">✓ Mark as Done</button>
+                                </form>
+                            <?php else: ?>
+                                <!-- Marked as complete - show Submit Activity and toggle button -->
+                                <a class="btn" href="submit_activity.php?module_id=<?= $row['id'] ?>">📨 Submit Activity</a>
+                                
+                                <form method="POST" style="margin: 0;">
+                                    <input type="hidden" name="action" value="mark_incomplete">
+                                    <input type="hidden" name="module_id" value="<?= $row['id'] ?>">
+                                    <button type="submit" class="btn warning">↩️ Mark as Incomplete</button>
+                                </form>
+                                
+                                <?php if ($row['marked_done_at']): ?>
+                                    <div class="completion-date">
+                                        Completed on <?= date('M j, Y \a\t g:i A', strtotime($row['marked_done_at'])) ?>
+                                    </div>
+                                <?php endif; ?>
                             <?php endif; ?>
                         <?php endif; ?>
                     </div>

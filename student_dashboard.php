@@ -84,8 +84,9 @@ if ($gradeId !== null) {
     }
 }
 
-// Submissions count and recent
+// Submissions count and recent (with grades)
 $submissionCount = 0;
+$gradedCount = 0;
 $recentSubmissions = [];
 if ($hasSubmissionsTable) {
     $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM activity_submissions WHERE student_id = ?");
@@ -94,7 +95,14 @@ if ($hasSubmissionsTable) {
     $sc = $stmt->get_result()->fetch_assoc();
     $submissionCount = $sc['cnt'] ?? 0;
 
-    $stmt = $conn->prepare("SELECT a.id, a.module_id, a.file_path, a.comments, a.status, a.submitted_at, m.title AS module_title
+    // Count graded submissions
+    $stmt = $conn->prepare("SELECT COUNT(*) as cnt FROM activity_submissions WHERE student_id = ? AND status = 'graded'");
+    $stmt->bind_param("i", $studentId);
+    $stmt->execute();
+    $gc = $stmt->get_result()->fetch_assoc();
+    $gradedCount = $gc['cnt'] ?? 0;
+
+    $stmt = $conn->prepare("SELECT a.id, a.module_id, a.file_path, a.comments, a.status, a.grade, a.submitted_at, m.title AS module_title
         FROM activity_submissions a
         LEFT JOIN modules m ON m.id = a.module_id
         WHERE a.student_id = ?
@@ -316,6 +324,11 @@ body {
     margin-bottom: 12px;
 }
 
+.submission-item.graded {
+    border-left-color: #8b5cf6;
+    background: #faf5ff;
+}
+
 .submission-item:last-child {
     margin-bottom: 0;
 }
@@ -327,6 +340,13 @@ body {
     font-size: 14px;
 }
 
+.submission-item .status-line {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
 .submission-item small {
     color: #9ca3af;
     display: block;
@@ -334,8 +354,13 @@ body {
     font-size: 12px;
 }
 
-.status-pending {
+.status-submitted {
     color: #f59e0b;
+    font-weight: 600;
+}
+
+.status-graded {
+    color: #8b5cf6;
     font-weight: 600;
 }
 
@@ -347,6 +372,16 @@ body {
 .status-rejected {
     color: #ef4444;
     font-weight: 600;
+}
+
+.grade-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #8b5cf6;
+    color: white;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
 }
 
 /* ===== RESPONSIVE FIX ===== */
@@ -374,6 +409,31 @@ body {
 
 <div class="main-container">
 
+    <!-- Quick Overview -->
+    <h2 class="section-title">📊 Quick Overview</h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="kpi"><?= $moduleCount ?></div>
+            <div class="label">📘 Modules Available</div>
+        </div>
+        <div class="stat-card">
+            <div class="kpi"><?= $completedCount ?></div>
+            <div class="label">✅ Completed Modules</div>
+        </div>
+        <div class="stat-card">
+            <div class="kpi"><?= $submissionCount ?></div>
+            <div class="label">📨 Total Submissions</div>
+        </div>
+        <div class="stat-card">
+            <div class="kpi"><?= $gradedCount ?></div>
+            <div class="label">🎓 Graded Activities</div>
+        </div>
+        <div class="stat-card">
+            <div class="kpi"><?= round($moduleCount > 0 ? ($completedCount / $moduleCount) * 100 : 0) ?>%</div>
+            <div class="label">📊 Progress</div>
+        </div>
+    </div>
+
     <!-- Learning Materials -->
     <h2 class="section-title">📚 Learning Materials</h2>
     <div class="content-grid">
@@ -389,6 +449,7 @@ body {
                         </li>
                     <?php endwhile; ?>
                 </ul>
+                <a href="student_modules.php" class="button-action">View All Modules →</a>
             <?php else: ?>
                 <p>No modules available for your grade level yet.</p>
             <?php endif; ?>
@@ -402,39 +463,23 @@ body {
             <?php elseif ($recentSubmissions && $recentSubmissions->num_rows > 0): ?>
                 <ul style="list-style: none; padding: 0; margin: 0;">
                     <?php while ($s = $recentSubmissions->fetch_assoc()): ?>
-                        <li class="submission-item">
+                        <li class="submission-item <?= $s['status'] === 'graded' ? 'graded' : '' ?>">
                             <strong><?= htmlspecialchars($s['module_title'] ?? 'Unknown Module') ?></strong>
-                            <div>Status: <span class="status-<?= htmlspecialchars($s['status']) ?>"><?= htmlspecialchars(ucfirst($s['status'])) ?></span></div>
+                            <div class="status-line">
+                                <span>Status: <span class="status-<?= htmlspecialchars($s['status']) ?>"><?= htmlspecialchars(ucfirst($s['status'])) ?></span></span>
+                                <?php if ($s['status'] === 'graded' && !empty($s['grade'])): ?>
+                                    <span class="grade-badge">Grade: <?= htmlspecialchars($s['grade']) ?></span>
+                                <?php endif; ?>
+                            </div>
                             <small><?= htmlspecialchars($s['submitted_at']) ?></small>
                         </li>
                     <?php endwhile; ?>
                 </ul>
+                <a href="my_submissions.php" class="button-action">View All Submissions →</a>
             <?php else: ?>
                 <p>No submissions yet.</p>
                 <a href="submit_activity.php" class="button-action">Get Started →</a>
             <?php endif; ?>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="kpi"><?= $completedCount ?></div>
-        <div class="label">✅ Completed Modules</div>
-    </div>
-    <div class="card">
-        <div class="kpi"><?= round($moduleCount > 0 ? ($completedCount / $moduleCount) * 100 : 0) ?>%</div>
-        <div class="label">📊 Progress</div>
-    </div>
-
-    <!-- Quick Overview -->
-    <h2 class="section-title">📊 Quick Overview</h2>
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="kpi"><?= $moduleCount ?></div>
-            <div class="label">📘 Modules Available</div>
-        </div>
-        <div class="stat-card">
-            <div class="kpi"><?= $submissionCount ?></div>
-            <div class="label">📨 Submissions</div>
         </div>
     </div>
 
