@@ -128,8 +128,8 @@ body {
 .student-header {
     position: fixed;
     top: 0;
-    left: 260px;
-    width: calc(100% - 260px);
+    left: 280px;
+    width: calc(100% - 280px);
     background: linear-gradient(135deg, #f59e0b, #f97316);
     color: white;
     padding: 18px 32px;
@@ -169,9 +169,10 @@ body {
 
 /* ===== MAIN CONTAINER ===== */
 .main-container {
-    padding: 120px 32px 64px;
-    max-width: 1400px;
-    margin: 0 auto;
+    margin-left: 280px;
+    padding: 100px 48px 64px 48px;
+    max-width: calc(100% - 280px);
+    min-height: 100vh;
 }
 
 /* ===== SECTION TITLES ===== */
@@ -385,14 +386,31 @@ body {
 }
 
 /* ===== RESPONSIVE FIX ===== */
+@media (max-width: 1024px) {
+    .student-header {
+        left: 260px;
+        width: calc(100% - 260px);
+    }
+    
+    .main-container {
+        margin-left: 260px;
+        padding: 100px 32px 48px 32px;
+        max-width: calc(100% - 260px);
+    }
+}
+
 @media (max-width: 900px) {
     .student-header {
         left: 0;
         width: 100%;
     }
+    
     .main-container {
+        margin-left: 0;
         padding: 110px 16px 48px;
+        max-width: 100%;
     }
+    
     .content-grid {
         grid-template-columns: 1fr;
     }
@@ -465,7 +483,7 @@ body {
                     <?php while ($s = $recentSubmissions->fetch_assoc()): ?>
                         <li class="submission-item <?= $s['status'] === 'graded' ? 'graded' : '' ?>">
                             <strong><?= htmlspecialchars($s['module_title'] ?? 'Unknown Module') ?></strong>
-                            <div class="status-line">
+            <div class="status-line">
                                 <span>Status: <span class="status-<?= htmlspecialchars($s['status']) ?>"><?= htmlspecialchars(ucfirst($s['status'])) ?></span></span>
                                 <?php if ($s['status'] === 'graded' && !empty($s['grade'])): ?>
                                     <span class="grade-badge">Grade: <?= htmlspecialchars($s['grade']) ?></span>
