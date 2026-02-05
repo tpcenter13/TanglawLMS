@@ -123,6 +123,7 @@ $sql = "CREATE TABLE IF NOT EXISTS modules (
     title VARCHAR(100) NOT NULL,
     subject_id INT,
     grade_level_id INT,
+    module_order INT NOT NULL DEFAULT 0,
     file_path VARCHAR(255),
     teacher_id INT,
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

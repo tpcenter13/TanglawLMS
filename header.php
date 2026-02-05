@@ -4,6 +4,9 @@ if (!isset($loggedUser)) {
     // if header is included without conn.php, try to include
     include 'conn.php';
 }
+// Resolve role from session or passed-in user
+$sessionUser = $_SESSION['loggedUser'] ?? null;
+$resolvedRole = $loggedUser['role'] ?? ($sessionUser['role'] ?? null);
 ?>
 <!doctype html>
 <html>
@@ -12,12 +15,16 @@ if (!isset($loggedUser)) {
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Tanglaw LMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <?php if ($resolvedRole === 'student' || $resolvedRole === 'detainee'): ?>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+        <link rel="stylesheet" href="assets/css/student-portal.css">
+    <?php endif; ?>
 </head>
 <?php
 // Add role-based body class when available
 $bodyClass = '';
-if (isset($loggedUser['role'])) {
-    $role = $loggedUser['role'];
+if ($resolvedRole) {
+    $role = $resolvedRole;
     if ($role === 'teacher') $bodyClass = 'role-teacher';
     elseif ($role === 'facilitator') $bodyClass = 'role-facilitator';
     elseif ($role === 'detainee' || $role === 'student') $bodyClass = 'role-student';

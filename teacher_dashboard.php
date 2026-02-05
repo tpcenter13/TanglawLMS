@@ -39,6 +39,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 $teacherResult = $teacherStmt->get_result()->fetch_assoc();
                 $teacher_school = $teacherResult['school'] ?? null;
                 $teacherStmt->close();
+
+                $module_order = isset($_POST['module_order']) ? intval($_POST['module_order']) : 0;
+                if ($module_order <= 0) {
+                    if ($teacher_school !== null) {
+                        $orderStmt = $conn->prepare("SELECT COALESCE(MAX(module_order),0) + 1 AS next_order FROM modules WHERE grade_level_id = ? AND school = ?");
+                        if ($orderStmt) {
+                            $orderStmt->bind_param("is", $grade_level_id, $teacher_school);
+                            $orderStmt->execute();
+                            $orderRes = $orderStmt->get_result()->fetch_assoc();
+                            $module_order = (int)($orderRes['next_order'] ?? 1);
+                            $orderStmt->close();
+                        }
+                    } else {
+                        $orderStmt = $conn->prepare("SELECT COALESCE(MAX(module_order),0) + 1 AS next_order FROM modules WHERE grade_level_id = ?");
+                        if ($orderStmt) {
+                            $orderStmt->bind_param("i", $grade_level_id);
+                            $orderStmt->execute();
+                            $orderRes = $orderStmt->get_result()->fetch_assoc();
+                            $module_order = (int)($orderRes['next_order'] ?? 1);
+                            $orderStmt->close();
+                        }
+                    }
+                }
                 
                 // Check for duplicate module
                 $checkStmt = $conn->prepare("SELECT id FROM modules WHERE title = ? AND subject_id = ? AND grade_level_id = ?");
@@ -55,8 +78,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     $checkStmt->close();
                 } else {
                     // Module doesn't exist - proceed with insertion
-                    $stmt = $conn->prepare("INSERT INTO modules (title, subject_id, grade_level_id, file_path, teacher_id, school) VALUES (?, ?, ?, ?, ?, ?)");
-                    $stmt->bind_param("siisis", $title, $subject_id, $grade_level_id, $filepath, $teacher_id, $teacher_school);
+                    $stmt = $conn->prepare("INSERT INTO modules (title, subject_id, grade_level_id, module_order, file_path, teacher_id, school) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->bind_param("siiisis", $title, $subject_id, $grade_level_id, $module_order, $filepath, $teacher_id, $teacher_school);
                     
                     if ($stmt->execute()) {
                         $message = '✅ Module uploaded successfully';
@@ -156,9 +179,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         $title = $_POST['module_title'] ?? '';
         $subject_id = !empty($_POST['subject_id']) ? intval($_POST['subject_id']) : null;
         $grade_level_id = !empty($_POST['grade_level_id']) ? intval($_POST['grade_level_id']) : null;
+        $module_order = isset($_POST['module_order']) ? intval($_POST['module_order']) : 0;
 
         // Verify ownership
-        $stmt = $conn->prepare("SELECT file_path, teacher_id FROM modules WHERE id = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT file_path, teacher_id, module_order FROM modules WHERE id = ? LIMIT 1");
         if ($stmt) {
             $stmt->bind_param('i', $module_id);
             $stmt->execute();
@@ -167,6 +191,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
             if ($res && (int)$res['teacher_id'] === (int)$teacher_id) {
                 $oldPath = $res['file_path'];
                 $newPath = $oldPath;
+                if ($module_order <= 0) {
+                    $module_order = (int)($res['module_order'] ?? 0);
+                }
                 // Handle optional new file
                 if (!empty($_FILES['edit_module_file']['tmp_name'])) {
                     $upload_dir = 'uploads/modules/';
@@ -179,8 +206,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     }
                 }
 
-                $updateStmt = $conn->prepare("UPDATE modules SET title = ?, subject_id = ?, grade_level_id = ?, file_path = ? WHERE id = ? AND teacher_id = ?");
-                $updateStmt->bind_param('siisii', $title, $subject_id, $grade_level_id, $newPath, $module_id, $teacher_id);
+                $updateStmt = $conn->prepare("UPDATE modules SET title = ?, subject_id = ?, grade_level_id = ?, module_order = ?, file_path = ? WHERE id = ? AND teacher_id = ?");
+                $updateStmt->bind_param('siiisii', $title, $subject_id, $grade_level_id, $module_order, $newPath, $module_id, $teacher_id);
                 if ($updateStmt->execute()) {
                     $message = '✅ Module updated successfully';
                 } else {
@@ -289,7 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
 $modules = $conn->query("SELECT m.*, s.title as subject_title, gl.level FROM modules m 
     LEFT JOIN subjects s ON m.subject_id = s.id 
     LEFT JOIN grade_levels gl ON m.grade_level_id = gl.id 
-    WHERE m.teacher_id = $teacher_id ORDER BY m.uploaded_at DESC")->fetch_all(MYSQLI_ASSOC);
+    WHERE m.teacher_id = $teacher_id ORDER BY m.module_order ASC, m.uploaded_at DESC")->fetch_all(MYSQLI_ASSOC);
 
 $activity_sheets = $conn->query("SELECT a.*, m.title as module_title FROM activity_sheets a 
     LEFT JOIN modules m ON a.module_id = m.id 
@@ -313,21 +340,21 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Teacher Dashboard - Tanglaw LMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/portal-shared.css">
     <!-- Dashboard v1.1 - If styles don't update, clear browser cache: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac) -->
     <style>
         .teacher-header {
-            background: linear-gradient(90deg, #059669 0%, #10b981 100%);
+            background: linear-gradient(120deg, var(--portal-primary), var(--portal-primary-2));
             color: white;
-            padding: 16px 24px;
+            padding: 18px 32px;
             border-radius: 0;
-            margin-left: 280px;
             position: fixed;
             top: 0;
-            left: 0;
-            right: 0;
+            left: 280px;
+            width: calc(100% - 280px);
             z-index: 100;
             height: auto;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
         }
         .teacher-header .container {
             max-width: 1400px;
@@ -336,10 +363,11 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 16px;
         }
         .teacher-header h1 { 
             margin: 0; 
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 700;
         }
         .teacher-header p { 
@@ -354,13 +382,13 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
         .main-content { 
             margin-left: 280px;
             margin-top: 0;
-            padding-top: 120px !important;
+            padding-top: 110px !important;
             min-height: 100vh;
         }
         .main-content .container {
             max-width: 1400px;
             margin: 0 auto;
-            padding: 24px !important;
+            padding: 0 24px 24px !important;
         }
         .section.active .grid {
             margin-top: 20px;
@@ -372,15 +400,15 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
             margin-bottom: 20px;
         }
         .section-nav button {
-            padding: 10px 15px;
+            padding: 10px 16px;
             border: none;
-            background: #e5e7eb;
+            background: #e2e8f0;
             cursor: pointer;
-            border-radius: 6px;
+            border-radius: 10px;
             font-weight: 600;
         }
         .section-nav button.active {
-            background: #10b981;
+            background: var(--portal-primary);
             color: white;
         }
         .section { 
@@ -399,10 +427,10 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
         }
         .section.active .grid .card {
             background: white;
-            padding: 16px;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 12px 28px rgba(15,23,42,0.08);
         }
         .section h2 {
             margin-top: 0;
@@ -421,22 +449,22 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-weight: 600; margin-bottom: 5px; }
         .form-group input, .form-group select, .form-group textarea {
-            padding: 8px;
+            padding: 10px 12px;
             border: 1px solid #d1d5db;
-            border-radius: 6px;
+            border-radius: 10px;
         }
         button[type="submit"] {
-            background: #10b981 !important;
+            background: var(--portal-primary) !important;
             color: white !important;
             padding: 10px 20px;
             border: none;
-            border-radius: 6px;
+            border-radius: 10px;
             cursor: pointer;
             font-weight: 600;
             transition: all 0.2s ease;
         }
         button[type="submit"]:hover { 
-            background: #059669 !important; 
+            background: var(--portal-primary-2) !important; 
             transform: translateY(-1px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
@@ -466,6 +494,28 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
         #editActivityModal .modal-content { background:white; padding:20px; border-radius:8px; width:95%; max-width:720px; box-shadow:0 6px 18px rgba(0,0,0,0.12); }
         
         /* Responsive adjustments */
+        @media (max-width: 1024px) {
+            .teacher-header {
+                left: 260px;
+                width: calc(100% - 260px);
+            }
+            .main-content {
+                margin-left: 260px;
+                padding-top: 110px !important;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .teacher-header {
+                left: 0;
+                width: 100%;
+            }
+            .main-content {
+                margin-left: 0;
+                padding: 120px 16px 48px !important;
+            }
+        }
+
         @media (max-width: 768px) {
             .teacher-header {
                 margin-left: 0;
@@ -496,14 +546,14 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
 
 <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()" style="display:none"></div>
 
-<div class="teacher-header">
+<div class="teacher-header portal-header">
     <div class="container">
         <h1>Tanglaw Learn</h1>
         <p>Welcome, <?= htmlspecialchars($_SESSION['loggedUser']['name']) ?> | <a href="logout.php">Logout</a></p>
     </div>
 </div>
 
-<div class="main-content">
+    <div class="main-content portal-main">
 <div class="container">
     <?php if ($message): ?>
         <div class="alert <?= strpos($message, '✅') !== false ? 'alert-success' : 'alert-error' ?>">
@@ -556,7 +606,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
                         </select>
                     </div>
                 </div>
-                <div class="form-row full">
+                <div class="form-row">
                     <div class="form-group">
                         <label>Grade Level</label>
                         <select name="grade_level_id" required>
@@ -565,6 +615,10 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
                             <option value="<?= $gl['id'] ?>"><?= htmlspecialchars($gl['level']) ?></option>
                             <?php endforeach; ?>
                         </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Module Order</label>
+                        <input type="number" name="module_order" min="1" placeholder="Auto">
                     </div>
                 </div>
                 <div class="form-row full">
@@ -581,6 +635,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
         <table>
             <thead>
                 <tr>
+                    <th>Order</th>
                     <th>Title</th>
                     <th>Subject</th>
                     <th>Grade Level</th>
@@ -591,6 +646,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
             <tbody>
                 <?php foreach($modules as $mod): ?>
                 <tr>
+                    <td><?= htmlspecialchars($mod['module_order'] ?? '-') ?></td>
                     <td><?= htmlspecialchars($mod['title']) ?></td>
                     <td><?= htmlspecialchars($mod['subject_title'] ?? 'N/A') ?></td>
                     <td><?= htmlspecialchars($mod['level'] ?? 'N/A') ?></td>
@@ -666,17 +722,23 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
                             </select>
                         </div>
                     </div>
-                    <div class="form-row full">
-                        <div class="form-group">
-                            <label>Grade Level</label>
-                            <select name="grade_level_id" id="edit_module_grade_level_id" required>
-                                <option value="">Select Grade Level</option>
-                                <?php foreach($grade_levels as $gl): ?>
-                                <option value="<?= $gl['id'] ?>"><?= htmlspecialchars($gl['level']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
+                <div class="form-row full">
+                    <div class="form-group">
+                        <label>Grade Level</label>
+                        <select name="grade_level_id" id="edit_module_grade_level_id" required>
+                            <option value="">Select Grade Level</option>
+                            <?php foreach($grade_levels as $gl): ?>
+                            <option value="<?= $gl['id'] ?>"><?= htmlspecialchars($gl['level']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
+                </div>
+                <div class="form-row full">
+                    <div class="form-group">
+                        <label>Module Order</label>
+                        <input type="number" name="module_order" id="edit_module_order" min="1" placeholder="Auto">
+                    </div>
+                </div>
                     <div class="form-row full">
                         <div class="form-group">
                             <label>Replace File (optional)</label>
@@ -927,6 +989,8 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
             if (subj) subj.value = mod.subject_id || '';
             var gl = document.getElementById('edit_module_grade_level_id');
             if (gl) gl.value = mod.grade_level_id || '';
+            var orderInput = document.getElementById('edit_module_order');
+            if (orderInput) orderInput.value = mod.module_order || '';
             var modal = document.getElementById('editModuleModal');
             if (modal) modal.style.display = 'flex';
             // focus title for quick edit

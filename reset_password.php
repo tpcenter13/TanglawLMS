@@ -176,6 +176,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token'])) {
             color: #333;
             font-weight: 500;
         }
+
+        .required {
+            color: #e11d48;
+            margin-left: 4px;
+        }
+
+        .field-error {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #b91c1c;
+            min-height: 16px;
+        }
+
+        .input-error {
+            border-color: #ef4444 !important;
+        }
+
+        .input-valid {
+            border-color: #22c55e !important;
+        }
         
         input[type="password"] {
             width: 100%;
@@ -307,15 +327,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token'])) {
                 <input type="hidden" name="token" value="<?php echo htmlspecialchars($token); ?>">
                 
                 <div class="form-group">
-                    <label for="password">New Password</label>
+                    <label for="password">New Password <span class="required">*</span></label>
                     <input type="password" id="password" name="password" required 
-                           placeholder="Enter new password" minlength="6">
+                           placeholder="Enter new password" minlength="6" autocomplete="new-password">
+                    <div class="field-error" id="passwordError" aria-live="polite"></div>
                 </div>
                 
                 <div class="form-group">
-                    <label for="confirm_password">Confirm New Password</label>
+                    <label for="confirm_password">Confirm New Password <span class="required">*</span></label>
                     <input type="password" id="confirm_password" name="confirm_password" required 
-                           placeholder="Confirm new password" minlength="6">
+                           placeholder="Confirm new password" minlength="6" autocomplete="new-password">
+                    <div class="field-error" id="confirmError" aria-live="polite"></div>
                 </div>
                 
                 <button type="submit" class="btn">
@@ -328,5 +350,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token'])) {
             </div>
         <?php endif; ?>
     </div>
+    <script>
+        (function () {
+            const form = document.querySelector('form');
+            if (!form) return;
+
+            const password = document.getElementById('password');
+            const confirm = document.getElementById('confirm_password');
+            const submit = form.querySelector('button[type="submit"]');
+            const passwordError = document.getElementById('passwordError');
+            const confirmError = document.getElementById('confirmError');
+
+            const state = { passwordTouched: false, confirmTouched: false };
+
+            function setError(input, errorEl, message) {
+                if (!errorEl) return;
+                if (message) {
+                    errorEl.textContent = message;
+                    input.classList.add('input-error');
+                    input.classList.remove('input-valid');
+                } else {
+                    errorEl.textContent = '';
+                    input.classList.remove('input-error');
+                    if (input.value.trim()) {
+                        input.classList.add('input-valid');
+                    } else {
+                        input.classList.remove('input-valid');
+                    }
+                }
+            }
+
+            function validate() {
+                let valid = true;
+                const passVal = password.value.trim();
+                const confirmVal = confirm.value.trim();
+
+                if (state.passwordTouched) {
+                    if (!passVal) {
+                        setError(password, passwordError, 'Password is required.');
+                        valid = false;
+                    } else if (passVal.length < 6) {
+                        setError(password, passwordError, 'Password must be at least 6 characters.');
+                        valid = false;
+                    } else {
+                        setError(password, passwordError, '');
+                    }
+                }
+
+                if (state.confirmTouched) {
+                    if (!confirmVal) {
+                        setError(confirm, confirmError, 'Please confirm your password.');
+                        valid = false;
+                    } else if (passVal && confirmVal !== passVal) {
+                        setError(confirm, confirmError, 'Passwords do not match.');
+                        valid = false;
+                    } else {
+                        setError(confirm, confirmError, '');
+                    }
+                }
+
+                if (submit) {
+                    submit.disabled = !valid;
+                }
+            }
+
+            password.addEventListener('input', function () {
+                state.passwordTouched = true;
+                validate();
+            });
+            confirm.addEventListener('input', function () {
+                state.confirmTouched = true;
+                validate();
+            });
+            form.addEventListener('submit', function () {
+                state.passwordTouched = true;
+                state.confirmTouched = true;
+                validate();
+            });
+
+            validate();
+        })();
+    </script>
 </body>
 </html>

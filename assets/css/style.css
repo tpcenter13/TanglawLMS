@@ -1,0 +1,30 @@
+/* Base styles for Tanglaw LMS */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    color: #0f172a;
+    background: #f5f6f8;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+a {
+    color: inherit;
+}
+
+.footer {
+    text-align: center;
+    padding: 24px 16px;
+    color: #64748b;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+}

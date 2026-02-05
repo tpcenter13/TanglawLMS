@@ -242,23 +242,22 @@ $providers = getAllProviders($conn);
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Admin Dashboard - Tanglaw LMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/portal-shared.css">
     <style>
         .admin-header {
-            background: linear-gradient(90deg, #003049 0%, #003049 100%);
+            background: linear-gradient(120deg, var(--portal-primary), var(--portal-primary-2));
             color: white;
-            padding: 20px;
+            padding: 18px 32px;
             border-radius: 0;
-            margin: 0 0 0 260px;
             position: fixed;
             top: 0;
-            left: 0;
-            width: calc(100% - 260px);
+            left: 280px;
+            width: calc(100% - 280px);
             z-index: 300;
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            height: 60px;
         }
         body {
             overflow: hidden;
@@ -267,16 +266,16 @@ $providers = getAllProviders($conn);
             height: 100%;
         }
         .main-content { 
-            margin-left: 260px;
-            padding-top: 80px;
+            margin-left: 280px;
+            padding-top: 110px;
             padding-bottom: 60px;
             height: 100vh;
             overflow-y: auto;
         }
         .main-content .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 0 24px;
         }
         
         .section { 
@@ -289,18 +288,12 @@ $providers = getAllProviders($conn);
         }
         .section.active .grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             gap: 20px;
             margin-bottom: 24px;
-            max-width: 1000px;
+            max-width: 1200px;
             margin-left: auto;
             margin-right: auto;
-        }
-
-        .section.active .grid .card {
-            width: 100%;
-            max-width: 280px;
-            margin: 0 auto;
         }
         
         @media (max-width: 1200px) {
@@ -315,6 +308,28 @@ $providers = getAllProviders($conn);
             }
         }
 
+        @media (max-width: 1024px) {
+            .admin-header {
+                left: 260px;
+                width: calc(100% - 260px);
+            }
+            .main-content {
+                margin-left: 260px;
+                padding-top: 110px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .admin-header {
+                left: 0;
+                width: 100%;
+            }
+            .main-content {
+                margin-left: 0;
+                padding: 120px 16px 48px;
+            }
+        }
+
         .section.dashboard-scrollable .grid-wrapper {
             max-height: 60vh;
             overflow-y: auto;
@@ -322,10 +337,10 @@ $providers = getAllProviders($conn);
         }
         .section.active .grid .card {
             background: white;
-            padding: 16px;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 12px 28px rgba(15,23,42,0.08);
         }
         .section h2 {
             margin-top: 0;
@@ -344,9 +359,9 @@ $providers = getAllProviders($conn);
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-weight: 600; margin-bottom: 5px; }
         .form-group input, .form-group select {
-            padding: 8px;
+            padding: 10px 12px;
             border: 1px solid #d1d5db;
-            border-radius: 6px;
+            border-radius: 10px;
         }
         button[type="submit"] {
             background:#4f772d;
@@ -611,19 +626,19 @@ $providers = getAllProviders($conn);
         });
     </script>
 </head>
-<body>
+<body class="role-admin">
 <?php include 'sidebar.php'; ?>
 
 <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()" style="display:none"></div>
 
-<header class="admin-header">
+<header class="admin-header portal-header">
     <div style="display:flex;align-items:center;gap:12px">
         <a href="#" style="color:#fff;font-weight:700;text-decoration:none;font-size:18px">TANGLAW LEARN</a>
     </div>
     <div></div>
 </header>
 
-<div class="main-content">
+<div class="main-content portal-main">
 
     <!-- ===== NOTIFICATION MODAL (replaces the old top alert) ===== -->
     <div id="notif_modal" class="modal" style="display:none;">
