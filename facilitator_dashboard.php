@@ -123,46 +123,49 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Facilitator Dashboard - Tanglaw LMS</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/portal-shared.css">
     <style>
         .facilitator-header {
-            background: linear-gradient(90deg, #9333ea 0%, #a855f7 100%);
+            background: linear-gradient(120deg, var(--portal-primary), var(--portal-primary-2));
             color: white;
-            padding: 20px;
+            padding: 18px 32px;
             border-radius: 0;
-            margin: 0 0 0 260px;
-            width: calc(100% - 260px);
+            width: calc(100% - 280px);
             position: fixed;
             top: 0;
-            left: 0;
+            left: 280px;
             z-index: 300;
         }
         .facilitator-header .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
         }
         .facilitator-header h1 { margin: 0 0 8px 0; }
         .facilitator-header p { margin: 0; opacity: 0.95; }
         .facilitator-header a { color: white; text-decoration: none; }
         .facilitator-header a:hover { text-decoration: underline; }
         .main-content { 
-            margin-left: 260px;
+            margin-left: 280px;
             margin-top: 0;
-            /* reduce overly large header offset */
-            padding-top: 100px;
-            padding-bottom: 40px;
+            padding-top: 110px;
+            padding-bottom: 60px;
         }
         .main-content .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
-            padding: 0 20px;
+            padding: 0 24px;
         }
         .main-content .card {
             background: white;
             padding: 24px;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 12px 28px rgba(15,23,42,0.08);
             margin-bottom: 20px;
         }
         .main-content .card h3 {
@@ -182,15 +185,15 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
             margin-bottom: 20px;
         }
         .section-nav button {
-            padding: 10px 15px;
+            padding: 10px 16px;
             border: none;
-            background: #e5e7eb;
+            background: #e2e8f0;
             cursor: pointer;
-            border-radius: 6px;
+            border-radius: 10px;
             font-weight: 600;
         }
         .section-nav button.active {
-            background: #a855f7;
+            background: var(--portal-primary);
             color: white;
         }
         .section { 
@@ -209,10 +212,10 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
         }
         .section.active .grid .card {
             background: white;
-            padding: 16px;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            padding: 20px;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 12px 28px rgba(15,23,42,0.08);
         }
         .section h2 {
             margin-top: 0;
@@ -237,23 +240,23 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-weight: 600; margin-bottom: 5px; }
         .form-group input, .form-group select {
-            padding: 8px;
+            padding: 10px 12px;
             border: 1px solid #d1d5db;
-            border-radius: 6px;
+            border-radius: 10px;
         }
         .card h2 {
             margin-top: 0;
         }
         button[type="submit"] {
-            background: var(--success);
+            background: var(--portal-primary);
             color: white;
             padding: 10px 20px;
             border: none;
-            border-radius: 6px;
+            border-radius: 10px;
             cursor: pointer;
             font-weight: 600;
         }
-        button[type="submit"]:hover { background: #15803d; }
+        button[type="submit"]:hover { background: var(--portal-primary-2); }
         .alert { padding: 12px; border-radius: 6px; margin-bottom: 15px; }
         .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
         .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
@@ -263,6 +266,28 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
         .checkbox-group { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 10px 0; }
         .checkbox-item { display: flex; align-items: center; gap: 8px; }
         .checkbox-item input { cursor: pointer; }
+
+        @media (max-width: 1024px) {
+            .facilitator-header {
+                left: 260px;
+                width: calc(100% - 260px);
+            }
+            .main-content {
+                margin-left: 260px;
+                padding-top: 110px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .facilitator-header {
+                left: 0;
+                width: 100%;
+            }
+            .main-content {
+                margin-left: 0;
+                padding: 120px 16px 48px;
+            }
+        }
     </style>
 </head>
 <body class="role-facilitator">
@@ -270,14 +295,14 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
 
 <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()" style="display:none"></div>
 
-<div class="facilitator-header">
+<div class="facilitator-header portal-header">
     <div class="container">
         <h1>Tanglaw Learn</h1>
         <p>Welcome, <?= htmlspecialchars($_SESSION['loggedUser']['name']) ?> | <a href="logout.php" style="color:white;">Logout</a></p>
     </div>
 </div>
 
-<div class="main-content">
+<div class="main-content portal-main">
 <div class="container">
     <?php if ($message): ?>
         <div class="alert <?= strpos($message, '✅') !== false ? 'alert-success' : 'alert-error' ?>">

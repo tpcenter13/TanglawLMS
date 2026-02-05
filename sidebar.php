@@ -10,40 +10,78 @@ $role = $_SESSION['loggedUser']['role'] ?? '';
 $menuItems = [];
 if ($role === 'admin') {
 $menuItems = [
-    'dashboard' => ['label' => 'Dashboard', 'icon' => '📊', 'url' => 'admin_dashboard.php?section=dashboard'],
-    'teachers' => ['label' => 'Teachers', 'icon' => '👨‍🏫', 'url' => 'admin_dashboard.php?section=teachers'],
-    'facilitators' => ['label' => 'Facilitators', 'icon' => '👥', 'url' => 'admin_dashboard.php?section=facilitators'],
-    'detainees' => ['label' => 'Students', 'icon' => '👨‍🎓', 'url' => 'admin_dashboard.php?section=detainees'],
-    'subjects' => ['label' => 'Subjects', 'icon' => '📚', 'url' => 'admin_dashboard.php?section=subjects'],
-    'grades' => ['label' => 'Grade Levels', 'icon' => '📊', 'url' => 'admin_dashboard.php?section=grades'],
-    'providers' => ['label' => 'Providers', 'icon' => '🏢', 'url' => 'admin_dashboard.php?section=providers'],
-    'reset_requests' => ['label' => 'Password Resets', 'icon' => '🔐', 'url' => 'password_reset_requests.php'],
+    'dashboard' => ['label' => 'Dashboard', 'url' => 'admin_dashboard.php?section=dashboard'],
+    'teachers' => ['label' => 'Teachers', 'url' => 'admin_dashboard.php?section=teachers'],
+    'facilitators' => ['label' => 'Facilitators', 'url' => 'admin_dashboard.php?section=facilitators'],
+    'detainees' => ['label' => 'Students', 'url' => 'admin_dashboard.php?section=detainees'],
+    'subjects' => ['label' => 'Subjects', 'url' => 'admin_dashboard.php?section=subjects'],
+    'grades' => ['label' => 'Grade Levels', 'url' => 'admin_dashboard.php?section=grades'],
+    'providers' => ['label' => 'Providers', 'url' => 'admin_dashboard.php?section=providers'],
+    'reset_requests' => ['label' => 'Password Resets', 'url' => 'password_reset_requests.php'],
 ];
 
 } elseif ($role === 'teacher') {
     $menuItems = [
-        'dashboard' => ['label' => 'Dashboard', 'icon' => '📊', 'url' => '?section=dashboard'],
-        'modules' => ['label' => 'Upload Modules', 'icon' => '📚', 'url' => '?section=modules'],
-        'upload_activity' => ['label' => 'Upload Activity Sheets', 'icon' => '📄', 'url' => '?section=activities'],
-        'submissions' => ['label' => 'Received Submissions', 'icon' => '📥', 'url' => '?section=submissions'],
-        'compute_grades' => ['label' => 'Compute Grades', 'icon' => '📊', 'url' => '?section=grades'],
-        'report_cards' => ['label' => 'Report Cards', 'icon' => '📋', 'url' => '?section=report'],
+        'dashboard' => ['label' => 'Dashboard', 'url' => '?section=dashboard'],
+        'modules' => ['label' => 'Upload Modules', 'url' => '?section=modules'],
+        'upload_activity' => ['label' => 'Upload Activity Sheets', 'url' => '?section=activities'],
+        'submissions' => ['label' => 'Received Submissions', 'url' => '?section=submissions'],
+        'compute_grades' => ['label' => 'Compute Grades', 'url' => '?section=grades'],
+        'report_cards' => ['label' => 'Report Cards', 'url' => '?section=report'],
     ];
 } elseif ($role === 'facilitator') {
     $menuItems = [
-        'dashboard' => ['label' => 'Dashboard', 'icon' => '📊', 'url' => '?section=dashboard'],
-        'print' => ['label' => 'Print Activities', 'icon' => '🖨️', 'url' => '?section=print'],
-        'distribute' => ['label' => 'Distribute', 'icon' => '📦', 'url' => '?section=distribute'],
-        'collect' => ['label' => 'Collect', 'icon' => '📥', 'url' => '?section=collect'],
-        'submit' => ['label' => 'Submit to Teacher', 'icon' => '📤', 'url' => '?section=submit'],
+        'dashboard' => ['label' => 'Dashboard', 'url' => '?section=dashboard'],
+        'print' => ['label' => 'Print Activities', 'url' => '?section=print'],
+        'distribute' => ['label' => 'Distribute', 'url' => '?section=distribute'],
+        'collect' => ['label' => 'Collect', 'url' => '?section=collect'],
+        'submit' => ['label' => 'Submit to Teacher', 'url' => '?section=submit'],
     ];
 } elseif ($role === 'student' || $role === 'detainee') {
     $menuItems = [
-        'dashboard' => ['label' => 'Dashboard', 'icon' => '📊', 'url' => 'student_dashboard.php'],
-        'modules' => ['label' => 'Modules', 'icon' => '📚', 'url' => 'student_modules.php'],
-        'submit' => ['label' => 'Submit', 'icon' => '📄', 'url' => 'submit_activity.php'],
-        'submissions' => ['label' => 'My Submissions', 'icon' => '📥', 'url' => 'my_submissions.php'],
+        'dashboard' => ['label' => 'Dashboard', 'url' => 'student_dashboard.php'],
+        'modules' => ['label' => 'Modules', 'url' => 'student_modules.php'],
+        'submit' => ['label' => 'Submit', 'url' => 'submit_activity.php'],
+        'submissions' => ['label' => 'My Submissions', 'url' => 'my_submissions.php'],
     ];
+}
+
+function getSidebarIcon($key) {
+    switch ($key) {
+        case 'dashboard':
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12l9-8 9 8v8a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        case 'teachers':
+        case 'facilitators':
+        case 'detainees':
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11a4 4 0 1 1-8 0 4 4 0 0 1 8 0zm-13 9a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        case 'subjects':
+        case 'modules':
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h9a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        case 'grades':
+        case 'compute_grades':
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M4 15h10M4 11h7M4 7h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+        case 'providers':
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18M5 20V9l7-5 7 5v11M9 20v-6h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        case 'reset_requests':
+        case 'change_password':
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        case 'upload_activity':
+        case 'submit':
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0-12l-4 4m4-4l4 4M5 21h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        case 'submissions':
+        case 'collect':
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v10H4zM8 7V4h8v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        case 'print':
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V4h12v5M6 17h12v3H6zM4 13h16v4H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        case 'distribute':
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h18M3 10l4-5M3 10l4 5M21 14H3m18 0l-4-5m4 5l-4 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        case 'report_cards':
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6zM9 13h6M9 9h6M9 17h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        case 'logout':
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 17l5-5-5-5M21 12H9M9 19H4V5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        default:
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+    }
 }
 ?>
 <style>
@@ -53,9 +91,17 @@ $menuItems = [
         box-sizing: border-box;
     }
 
+    :root {
+        --sidebar-width: 280px;
+        --sidebar-width-collapsed: 88px;
+        --sidebar-width-tablet: 260px;
+        --sidebar-toggle-size: 32px;
+        --sidebar-toggle-offset: 12px;
+    }
+
     /* Sidebar Styles */
     .sidebar { 
-        width: 280px; 
+        width: var(--sidebar-width); 
         position: fixed; 
         left: 0; 
         top: 0; 
@@ -63,9 +109,9 @@ $menuItems = [
         background: #023047;
         color: #fff; 
         overflow-y: auto; 
-        overflow-x: hidden;
+        overflow-x: visible;
         z-index: 200; 
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         display: flex;
         flex-direction: column;
         box-shadow: 4px 0 12px rgba(0, 0, 0, 0.1);
@@ -91,16 +137,75 @@ $menuItems = [
 
     /* Sidebar Header */
     .sidebar-header {
-        padding: 24px 20px 20px;
+        padding: 20px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        position: relative;
+    }
+
+    .sidebar-header-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
     }
 
     .sidebar-logo {
-        font-size: 24px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 16px;
         font-weight: 700;
         color: #fff;
-        margin-bottom: 8px;
-        letter-spacing: -0.5px;
+        margin-bottom: 10px;
+        letter-spacing: 0.2px;
+    }
+
+    .sidebar-logo img {
+        width: 36px;
+        height: 36px;
+        object-fit: contain;
+    }
+
+    .collapse-toggle {
+        position: fixed;
+        left: calc(var(--sidebar-width) - var(--sidebar-toggle-size) - var(--sidebar-toggle-offset));
+        top: 50%;
+        transform: translateY(-50%);
+        width: var(--sidebar-toggle-size);
+        height: var(--sidebar-toggle-size);
+        border: none;
+        border-radius: 50%;
+        background: #ffffff;
+        border: 2px solid #023047;
+        color: #023047;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        z-index: 400;
+        padding: 0;
+    }
+
+    .collapse-toggle:hover {
+        background: #f0f0f0;
+        transform: translateY(-50%) scale(1.1);
+    }
+
+    .collapse-toggle:focus {
+        outline: 2px solid #023047;
+        outline-offset: 2px;
+    }
+
+    .collapse-toggle svg {
+        width: 16px;
+        height: 16px;
+        transition: transform 0.3s ease;
+        flex-shrink: 0;
     }
 
     .role-badge {
@@ -173,12 +278,30 @@ $menuItems = [
     }
 
     .sidebar-nav a .icon {
-        font-size: 20px;
         width: 24px;
+        height: 24px;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+    }
+    .sidebar-nav a .icon svg {
+        width: 20px;
+        height: 20px;
+        display: block;
+    }
+    .nav-logout .icon {
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .nav-logout .icon svg {
+        width: 18px;
+        height: 18px;
+        display: block;
     }
 
     .sidebar-nav a .label {
@@ -225,11 +348,18 @@ $menuItems = [
     .nav-logout a {
         margin-bottom: 6px;
         color: rgba(255, 255, 255, 0.85);
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
+        border-radius: 10px;
     }
 
     .nav-logout a:hover {
         background: rgba(255, 255, 255, 0.12);
         color: #fff;
+        text-decoration: none;
     }
 
     .nav-logout a.logout-btn {
@@ -298,25 +428,114 @@ $menuItems = [
         display: block;
     }
 
+    /* Collapsed sidebar (desktop) */
+    body.sidebar-collapsed .sidebar {
+        width: var(--sidebar-width-collapsed);
+    }
+
+    body.sidebar-collapsed .sidebar-header {
+        align-items: center;
+    }
+
+    body.sidebar-collapsed .collapse-toggle svg {
+        transform: rotate(180deg);
+    }
+
+    body.sidebar-collapsed .collapse-toggle {
+        left: calc(var(--sidebar-width-collapsed) - var(--sidebar-toggle-size) - var(--sidebar-toggle-offset));
+    }
+
+    body.sidebar-collapsed .sidebar-logo span,
+    body.sidebar-collapsed .role-badge,
+    body.sidebar-collapsed .user-box,
+    body.sidebar-collapsed .nav-section-title,
+    body.sidebar-collapsed .sidebar-nav a .label,
+    body.sidebar-collapsed .nav-logout a .label {
+        display: none;
+    }
+
+    body.sidebar-collapsed .sidebar-nav a,
+    body.sidebar-collapsed .nav-logout a {
+        justify-content: center;
+        padding: 12px 10px;
+    }
+
+    body.sidebar-collapsed .sidebar-nav a.active::before {
+        height: 60%;
+    }
+
+    body.sidebar-collapsed .main-content,
+    body.sidebar-collapsed .main-container {
+        margin-left: var(--sidebar-width-collapsed) !important;
+        max-width: calc(100% - var(--sidebar-width-collapsed)) !important;
+    }
+
+    body.sidebar-collapsed .student-header,
+    body.sidebar-collapsed .teacher-header,
+    body.sidebar-collapsed .admin-header,
+    body.sidebar-collapsed .facilitator-header {
+        left: var(--sidebar-width-collapsed) !important;
+        width: calc(100% - var(--sidebar-width-collapsed)) !important;
+    }
+
+    @media (max-width: 768px) {
+        body.sidebar-collapsed .sidebar {
+            width: 100%;
+            max-width: 300px;
+        }
+        body.sidebar-collapsed .sidebar-logo span,
+        body.sidebar-collapsed .role-badge,
+        body.sidebar-collapsed .user-box,
+        body.sidebar-collapsed .nav-section-title,
+        body.sidebar-collapsed .sidebar-nav a .label,
+        body.sidebar-collapsed .nav-logout a .label {
+            display: inline;
+        }
+        body.sidebar-collapsed .main-content,
+        body.sidebar-collapsed .main-container {
+            margin-left: 0 !important;
+            max-width: 100% !important;
+        }
+        body.sidebar-collapsed .student-header,
+        body.sidebar-collapsed .teacher-header,
+        body.sidebar-collapsed .admin-header,
+        body.sidebar-collapsed .facilitator-header {
+            left: 0 !important;
+            width: 100% !important;
+        }
+    }
+
     /* Role-specific colors */
     body.role-admin .sidebar { 
         background: #023047;
     }
 
+    body.role-admin .collapse-toggle {
+        border-color: #023047;
+    }
+
     body.role-teacher .sidebar { 
-        background: #059669;
+        background: #f59e0b;
+    }
+
+    body.role-teacher .collapse-toggle {
+        border-color: #f59e0b;
     }
 
     body.role-teacher .sidebar-toggle {
-        background: #059669;
+        background: #f59e0b;
     }
 
     body.role-teacher .sidebar-toggle:hover {
-        background: #047857;
+        background: #d97706;
     }
 
     body.role-facilitator .sidebar { 
         background: #7c3aed;
+    }
+
+    body.role-facilitator .collapse-toggle {
+        border-color: #7c3aed;
     }
 
     body.role-facilitator .sidebar-toggle {
@@ -328,30 +547,41 @@ $menuItems = [
     }
 
     body.role-student .sidebar { 
-        background: #f59e0b;
+        background: #0b1c33;
+    }
+
+    body.role-student .collapse-toggle {
+        border-color: #0b1c33;
     }
 
     body.role-student .sidebar-toggle {
-        background: #f59e0b;
+        background: #0b1c33;
     }
 
     body.role-student .sidebar-toggle:hover {
-        background: #d97706;
+        background: #173a6b;
     }
 
     /* Tablet and Mobile Responsive */
     @media (max-width: 1024px) {
+        :root {
+            --sidebar-width: var(--sidebar-width-tablet);
+        }
         .sidebar {
-            width: 260px;
+            width: var(--sidebar-width);
         }
 
         .main-content {
-            margin-left: 260px;
+            margin-left: var(--sidebar-width);
             padding: 24px;
         }
     }
 
     @media (max-width: 768px) {
+        .collapse-toggle {
+            display: none;
+        }
+        
         .sidebar-toggle {
             display: flex;
             align-items: center;
@@ -397,13 +627,24 @@ $menuItems = [
 </button>
 
 <!-- Sidebar Backdrop -->
-<div class="sidebar-backdrop" onclick="document.body.classList.remove('sidebar-open')"></div>
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="document.body.classList.remove('sidebar-open')"></div>
 
 <!-- Sidebar -->
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
-        
+        <div class="sidebar-header-top">
+            <div class="sidebar-logo">
+                <img src="tanglaw_logo.png" alt="Tanglaw LMS">
+                <span>Tanglaw LMS</span>
+            </div>
+        </div>
         <span class="role-badge"><?= htmlspecialchars($role === 'student' || $role === 'detainee' ? 'Student' : $role) ?></span>
+    </div>
+
+    <div class="collapse-toggle" onclick="toggleSidebar()" role="button" tabindex="0" aria-label="Toggle sidebar" onkeypress="if(event.key==='Enter') toggleSidebar()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <path d="M15 18l-6-6 6-6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
     </div>
     
     <div class="user-box">
@@ -432,7 +673,7 @@ $menuItems = [
                     }
                 ?>
                 <a href="<?= $it['url'] ?>" class="<?= $isActive ? 'active' : '' ?>" onclick="if(window.innerWidth <= 768) document.body.classList.remove('sidebar-open')">
-                    <span class="icon"><?= $it['icon'] ?></span>
+                    <span class="icon"><?= getSidebarIcon($k) ?></span>
                     <span class="label"><?= $it['label'] ?></span>
                 </a>
             <?php endforeach; ?>
@@ -442,11 +683,11 @@ $menuItems = [
 
     <div class="nav-logout">
         <a href="change_password.php" onclick="if(window.innerWidth <= 768) document.body.classList.remove('sidebar-open')">
-            <span class="icon">🔐</span>
+            <span class="icon"><?= getSidebarIcon('change_password') ?></span>
             <span class="label">Change Password</span>
         </a>
         <a href="logout.php" class="logout-btn">
-            <span class="icon">🚪</span>
+            <span class="icon"><?= getSidebarIcon('logout') ?></span>
             <span class="label">Logout</span>
         </a>
     </div>

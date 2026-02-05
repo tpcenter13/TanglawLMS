@@ -138,6 +138,7 @@ CREATE TABLE IF NOT EXISTS `modules` (
   `title` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
   `subject_id` int(11) DEFAULT NULL,
   `grade_level_id` int(11) DEFAULT NULL,
+  `module_order` int(11) NOT NULL DEFAULT 0,
   `file_path` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `teacher_id` int(11) DEFAULT NULL,
   `uploaded_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
