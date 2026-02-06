@@ -62,7 +62,13 @@ if ($resCheck && $resCheck->num_rows > 0) {
                                 <td><?php echo htmlspecialchars($r['module_title']); ?></td>
                                 <td><a href="<?php echo htmlspecialchars($r['file_path']); ?>" target="_blank">View File</a></td>
                                 <td><?php echo nl2br(htmlspecialchars($r['comments'])); ?></td>
-                                <td><span class="status-<?php echo htmlspecialchars($r['status']); ?>"><?php echo htmlspecialchars(ucfirst($r['status'])); ?></span></td>
+                                <td>
+                                    <?php
+                                        $statusLabel = ucfirst($r['status']);
+                                        if ($r['status'] === 'submitted') $statusLabel = 'Awaiting Teacher';
+                                    ?>
+                                    <span class="status-<?php echo htmlspecialchars($r['status']); ?>"><?php echo htmlspecialchars($statusLabel); ?></span>
+                                </td>
                                 <td><?php echo htmlspecialchars($r['grade'] ?? '-'); ?></td>
                                 <td><?php echo htmlspecialchars($r['submitted_at']); ?></td>
                             </tr>

@@ -11,6 +11,34 @@ $facilitator_id = $_SESSION['loggedUser']['id'];
 $section = $_GET['section'] ?? 'dashboard';
 $message = '';
 
+function tableExists($conn, $table) {
+    $resCheck = $conn->query("SHOW TABLES LIKE '$table'");
+    return $resCheck && $resCheck->num_rows > 0;
+}
+
+function columnExists($conn, $table, $column) {
+    $tableSafe = str_replace('`', '', $table);
+    $colSafe = $conn->real_escape_string($column);
+    $sql = "SHOW COLUMNS FROM `{$tableSafe}` LIKE '{$colSafe}'";
+    $res = $conn->query($sql);
+    return $res && $res->num_rows > 0;
+}
+
+
+function ensureModuleApprovalSchema($conn) {
+    if (!columnExists($conn, 'modules', 'approval_status')) {
+        $conn->query("ALTER TABLE modules ADD COLUMN approval_status VARCHAR(20) NOT NULL DEFAULT 'approved'");
+    }
+    if (!columnExists($conn, 'modules', 'approved_by')) {
+        $conn->query("ALTER TABLE modules ADD COLUMN approved_by INT NULL");
+    }
+    if (!columnExists($conn, 'modules', 'approved_at')) {
+        $conn->query("ALTER TABLE modules ADD COLUMN approved_at TIMESTAMP NULL DEFAULT NULL");
+    }
+}
+
+ensureModuleApprovalSchema($conn);
+
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $action = $_POST['action'] ?? '';
@@ -90,9 +118,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
                 $stmt->close();
             }
-            $message = "✅ Submitted $success_count submission(s) to teacher";
+            $message = "Submitted $success_count submission(s) to teacher";
         } else {
-            $message = "❌ Please select at least one submission";
+            $message = "Please select at least one submission";
+        }
+    }
+
+    // Approve Module
+    if ($action == 'approve_module') {
+        $module_id = intval($_POST['module_id'] ?? 0);
+        if ($module_id > 0) {
+            $stmt = $conn->prepare("UPDATE modules SET approval_status = 'approved', approved_by = ?, approved_at = NOW() WHERE id = ?");
+            if ($stmt) {
+                $stmt->bind_param("ii", $facilitator_id, $module_id);
+                if ($stmt->execute()) {
+                    $message = 'Module approved successfully';
+                } else {
+                    $message = 'Error approving module';
+                }
+                $stmt->close();
+            }
         }
     }
 }
@@ -101,6 +146,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 $modules = $conn->query("SELECT m.*, s.title as subject_title, gl.level FROM modules m 
     LEFT JOIN subjects s ON m.subject_id = s.id 
     LEFT JOIN grade_levels gl ON m.grade_level_id = gl.id 
+    ORDER BY m.uploaded_at DESC")->fetch_all(MYSQLI_ASSOC);
+
+$pending_modules = $conn->query("SELECT m.*, s.title as subject_title, gl.level, t.name as teacher_name FROM modules m 
+    LEFT JOIN subjects s ON m.subject_id = s.id 
+    LEFT JOIN grade_levels gl ON m.grade_level_id = gl.id 
+    LEFT JOIN teachers t ON m.teacher_id = t.id
+    WHERE m.approval_status = 'pending'
     ORDER BY m.uploaded_at DESC")->fetch_all(MYSQLI_ASSOC);
 
 $activity_sheets = $conn->query("SELECT a.*, m.title as module_title FROM activity_sheets a 
@@ -335,6 +387,49 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
         </div>
     </div>
 
+    <!-- APPROVE MODULES SECTION -->
+    <div class="section <?= $section == 'approve' ? 'active' : '' ?>">
+        <h2>✅ Approve Modules</h2>
+
+        <div class="card">
+            <?php if (empty($pending_modules)): ?>
+                <p>No modules awaiting approval.</p>
+            <?php else: ?>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Module</th>
+                            <th>Subject</th>
+                            <th>Grade Level</th>
+                            <th>Teacher</th>
+                            <th>Uploaded</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($pending_modules as $mod): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($mod['title']) ?></td>
+                            <td><?= htmlspecialchars($mod['subject_title'] ?? 'N/A') ?></td>
+                            <td><?= htmlspecialchars($mod['level'] ?? 'N/A') ?></td>
+                            <td><?= htmlspecialchars($mod['teacher_name'] ?? 'N/A') ?></td>
+                            <td><?= date('M d, Y', strtotime($mod['uploaded_at'])) ?></td>
+                            <td>
+                                <a href="view_module.php?id=<?= $mod['id'] ?>" target="_blank" style="margin-right:8px;">Preview</a>
+                                <form method="POST" style="display:inline;">
+                                    <input type="hidden" name="action" value="approve_module">
+                                    <input type="hidden" name="module_id" value="<?= $mod['id'] ?>">
+                                    <button type="submit">Approve</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+        </div>
+    </div>
+
     <!-- PRINT ACTIVITY SHEETS SECTION -->
     <div class="section <?= $section == 'print' ? 'active' : '' ?>">
         <h2>🖨️ Print Activity Sheets</h2>
@@ -450,7 +545,7 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
                 <table>
                     <thead>
                         <tr>
-                            <th><input type="checkbox" id="select-all" onchange="document.querySelectorAll('input[name=\"submission_ids[]\"]').forEach(el => </th>
+                            <th><input type="checkbox" id="select-all" onclick="document.querySelectorAll('input[name=\"submission_ids[]\"]').forEach(el => el.checked = this.checked);"></th>
                             <th>Detainee</th>
                             <th>Activity</th>
                             <th>Submitted</th>
@@ -470,6 +565,7 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
                 
                 <button type="submit" style="margin-top: 15px;">Submit Selected to Teacher</button>
             </form>
+        </div>
         </div>
     </div>
 

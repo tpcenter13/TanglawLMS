@@ -21,6 +21,15 @@ function tableExists($conn, $table) {
     return $resCheck && $resCheck->num_rows > 0;
 }
 
+function columnExists($conn, $table, $column) {
+    $tableSafe = str_replace('`', '', $table);
+    $colSafe = $conn->real_escape_string($column);
+    $sql = "SHOW COLUMNS FROM `{$tableSafe}` LIKE '{$colSafe}'";
+    $res = $conn->query($sql);
+    return $res && $res->num_rows > 0;
+}
+
+
 // Resolve grade_level text to grade_levels.id (modules use grade_level_id FK)
 $gradeId = null;
 if ($grade) {
@@ -38,14 +47,16 @@ if ($grade) {
 
 $hasSubmissionsTable = tableExists($conn, 'activity_submissions');
 $hasActivitiesTable = tableExists($conn, 'activity_sheets');
+$hasModuleApproval = columnExists($conn, 'modules', 'approval_status');
 $orderBy = $PORTAL_MODULE_ORDER_BY ?? 'm.uploaded_at ASC';
+$approvalClause = $hasModuleApproval ? " AND m.approval_status = 'approved'" : "";
 
 // Build module list with latest activity and latest submission
 $modulesAll = [];
 if ($gradeId !== null && $studentSchool !== null) {
     if ($hasSubmissionsTable && $hasActivitiesTable) {
         $query = "
-            SELECT m.id, m.title, m.file_path, m.uploaded_at, m.module_order,
+            SELECT m.id, m.title, m.subject_id, s.title as subject_title, m.file_path, m.uploaded_at, m.module_order,
                    COALESCE(mp.status, 'not_started') as progress_status,
                    mp.marked_done_at,
                    asub.status as submission_status,
@@ -55,6 +66,7 @@ if ($gradeId !== null && $studentSchool !== null) {
                    act.title as activity_title,
                    act.file_path as activity_path
             FROM modules m
+            LEFT JOIN subjects s ON m.subject_id = s.id
             LEFT JOIN module_progress mp ON m.id = mp.module_id AND mp.student_id = ?
             LEFT JOIN (
                 SELECT s1.*
@@ -72,7 +84,7 @@ if ($gradeId !== null && $studentSchool !== null) {
                 GROUP BY module_id
             ) act_idx ON act_idx.module_id = m.id
             LEFT JOIN activity_sheets act ON act.id = act_idx.latest_activity_id
-            WHERE m.grade_level_id = ? AND m.school = ?
+            WHERE m.grade_level_id = ? AND m.school = ?$approvalClause
             ORDER BY $orderBy
         ";
         $stmt = $conn->prepare($query);
@@ -87,7 +99,7 @@ if ($gradeId !== null && $studentSchool !== null) {
         }
     } elseif ($hasSubmissionsTable && !$hasActivitiesTable) {
         $query = "
-            SELECT m.id, m.title, m.file_path, m.uploaded_at, m.module_order,
+            SELECT m.id, m.title, m.subject_id, s.title as subject_title, m.file_path, m.uploaded_at, m.module_order,
                    COALESCE(mp.status, 'not_started') as progress_status,
                    mp.marked_done_at,
                    asub.status as submission_status,
@@ -97,6 +109,7 @@ if ($gradeId !== null && $studentSchool !== null) {
                    NULL as activity_title,
                    NULL as activity_path
             FROM modules m
+            LEFT JOIN subjects s ON m.subject_id = s.id
             LEFT JOIN module_progress mp ON m.id = mp.module_id AND mp.student_id = ?
             LEFT JOIN (
                 SELECT s1.*
@@ -108,7 +121,7 @@ if ($gradeId !== null && $studentSchool !== null) {
                     GROUP BY module_id, student_id
                 ) s2 ON s2.module_id = s1.module_id AND s2.student_id = s1.student_id AND s2.max_submitted_at = s1.submitted_at
             ) asub ON asub.module_id = m.id AND asub.student_id = ?
-            WHERE m.grade_level_id = ? AND m.school = ?
+            WHERE m.grade_level_id = ? AND m.school = ?$approvalClause
             ORDER BY $orderBy
         ";
         $stmt = $conn->prepare($query);
@@ -123,7 +136,7 @@ if ($gradeId !== null && $studentSchool !== null) {
         }
     } elseif (!$hasSubmissionsTable && $hasActivitiesTable) {
         $query = "
-            SELECT m.id, m.title, m.file_path, m.uploaded_at, m.module_order,
+            SELECT m.id, m.title, m.subject_id, s.title as subject_title, m.file_path, m.uploaded_at, m.module_order,
                    COALESCE(mp.status, 'not_started') as progress_status,
                    mp.marked_done_at,
                    NULL as submission_status,
@@ -133,6 +146,7 @@ if ($gradeId !== null && $studentSchool !== null) {
                    act.title as activity_title,
                    act.file_path as activity_path
             FROM modules m
+            LEFT JOIN subjects s ON m.subject_id = s.id
             LEFT JOIN module_progress mp ON m.id = mp.module_id AND mp.student_id = ?
             LEFT JOIN (
                 SELECT module_id, COUNT(*) as activity_count, MAX(id) as latest_activity_id
@@ -140,7 +154,7 @@ if ($gradeId !== null && $studentSchool !== null) {
                 GROUP BY module_id
             ) act_idx ON act_idx.module_id = m.id
             LEFT JOIN activity_sheets act ON act.id = act_idx.latest_activity_id
-            WHERE m.grade_level_id = ? AND m.school = ?
+            WHERE m.grade_level_id = ? AND m.school = ?$approvalClause
             ORDER BY $orderBy
         ";
         $stmt = $conn->prepare($query);
@@ -155,7 +169,7 @@ if ($gradeId !== null && $studentSchool !== null) {
         }
     } else {
         $query = "
-            SELECT m.id, m.title, m.file_path, m.uploaded_at, m.module_order,
+            SELECT m.id, m.title, m.subject_id, s.title as subject_title, m.file_path, m.uploaded_at, m.module_order,
                    COALESCE(mp.status, 'not_started') as progress_status,
                    mp.marked_done_at,
                    NULL as submission_status,
@@ -165,8 +179,9 @@ if ($gradeId !== null && $studentSchool !== null) {
                    NULL as activity_title,
                    NULL as activity_path
             FROM modules m
+            LEFT JOIN subjects s ON m.subject_id = s.id
             LEFT JOIN module_progress mp ON m.id = mp.module_id AND mp.student_id = ?
-            WHERE m.grade_level_id = ? AND m.school = ?
+            WHERE m.grade_level_id = ? AND m.school = ?$approvalClause
             ORDER BY $orderBy
         ";
         $stmt = $conn->prepare($query);
@@ -185,25 +200,32 @@ if ($gradeId !== null && $studentSchool !== null) {
 $moduleCount = count($modulesAll);
 
 $passingGrade = $PORTAL_PASSING_GRADE;
-$priorCompleted = true;
-foreach ($modulesAll as &$module) {
-    $module['activity_count'] = (int)($module['activity_count'] ?? 0);
-    $module['has_activity'] = $module['activity_count'] > 0;
-    $gradeVal = $module['submission_grade'];
-    $isGraded = ($module['submission_status'] === 'graded' && $gradeVal !== null);
-    $isPassed = $module['has_activity'] ? ($isGraded && (float)$gradeVal >= $passingGrade) : ($module['progress_status'] === 'completed');
-    $isFailed = $module['has_activity'] && $isGraded && (float)$gradeVal < $passingGrade;
+    $priorCompletedBySubject = [];
+    foreach ($modulesAll as &$module) {
+        $module['activity_count'] = (int)($module['activity_count'] ?? 0);
+        $module['has_activity'] = $module['activity_count'] > 0;
+        $gradeVal = $module['submission_grade'];
+        $isGraded = ($module['submission_status'] === 'graded' && $gradeVal !== null);
+        $isPassed = $module['has_activity'] ? ($isGraded && (float)$gradeVal >= $passingGrade) : false;
+        $isFailed = $module['has_activity'] && $isGraded && (float)$gradeVal < $passingGrade;
+        $hasSubmission = !empty($module['submission_status']);
+        $isPending = ($module['submission_status'] === 'submitted');
 
-    $module['is_passed'] = $isPassed;
-    $module['is_failed'] = $isFailed;
-    $module['is_completed'] = $isPassed;
-    if (!$module['has_activity']) {
-        $module['is_completed'] = ($module['progress_status'] === 'completed');
+        $module['is_passed'] = $isPassed;
+        $module['is_failed'] = $isFailed;
+        $module['has_submission'] = $hasSubmission;
+        $module['is_pending'] = $isPending;
+        $module['is_completed'] = $module['has_activity'] ? $module['is_passed'] : ($module['progress_status'] === 'completed');
+
+        $subjectKey = (string)($module['subject_id'] ?? 0);
+        if (!array_key_exists($subjectKey, $priorCompletedBySubject)) {
+            $priorCompletedBySubject[$subjectKey] = true;
+        }
+        $module['is_locked'] = !$priorCompletedBySubject[$subjectKey];
+        $module['can_submit'] = !$module['is_locked'] && $module['has_activity'] && !$module['is_passed'] && !$isPending;
+        $module['can_mark_done'] = !$module['is_locked'] && !$module['has_activity'] && $module['progress_status'] !== 'completed';
+        $priorCompletedBySubject[$subjectKey] = $priorCompletedBySubject[$subjectKey] && $module['is_completed'];
     }
-    $module['is_locked'] = !$priorCompleted;
-    $module['can_submit'] = !$module['is_locked'] && $module['has_activity'] && $module['progress_status'] === 'completed' && !$module['is_passed'];
-    $priorCompleted = $priorCompleted && $module['is_completed'];
-}
 unset($module);
 
 $recentModules = array_slice(array_reverse($modulesAll), 0, 5);
@@ -307,6 +329,9 @@ if ($hasSubmissionsTable) {
                             <?php $moduleNumber = !empty($m['module_order']) ? (int)$m['module_order'] : ($idx + 1); ?>
                             <strong>Module <?= $moduleNumber ?>: <?= htmlspecialchars($m['title']) ?></strong>
                             <div class="module-meta">
+                                <?php if (!empty($m['subject_title'])): ?>
+                                    <span class="module-info">Subject: <?= htmlspecialchars($m['subject_title']) ?></span>
+                                <?php endif; ?>
                                 <?php if ($m['is_locked']): ?>
                                     <span class="status-pill status-pill--locked">Locked</span>
                                     <span class="module-info">Complete previous module to unlock</span>
@@ -315,20 +340,20 @@ if ($hasSubmissionsTable) {
                                 <?php elseif ($m['has_activity'] && $m['is_failed']): ?>
                                     <span class="status-pill status-pill--failed">Needs Revision</span>
                                 <?php elseif ($m['submission_status'] === 'submitted'): ?>
-                                    <span class="status-pill status-pill--pending">Awaiting Review</span>
-                                <?php elseif ($m['progress_status'] === 'reading'): ?>
-                                    <span class="status-pill status-pill--reading">In Progress</span>
-                                <?php elseif ($m['progress_status'] === 'completed' && $m['has_activity']): ?>
-                                    <span class="status-pill status-pill--pending">Ready for Activity</span>
+                                    <span class="status-pill status-pill--pending">Awaiting Teacher</span>
                                 <?php elseif ($m['progress_status'] === 'completed'): ?>
                                     <span class="status-pill status-pill--completed">Completed</span>
+                                <?php elseif ($m['progress_status'] === 'reading'): ?>
+                                    <span class="status-pill status-pill--reading">In Progress</span>
+                                <?php elseif ($m['has_activity']): ?>
+                                    <span class="status-pill status-pill--pending">Activity Available</span>
                                 <?php else: ?>
                                     <span class="status-pill status-pill--pending">Not Started</span>
                                 <?php endif; ?>
                             </div>
                             <div class="module-actions">
                                 <?php if (!$m['is_locked']): ?>
-                                    <a href="<?= htmlspecialchars($m['file_path']) ?>" target="_blank" class="button-secondary">Open Module</a>
+                                    <a href="view_module.php?id=<?= $m['id'] ?>" class="button-secondary">Preview Module</a>
                                 <?php else: ?>
                                     <span class="button-secondary btn disabled">Locked</span>
                                 <?php endif; ?>
@@ -363,7 +388,11 @@ if ($hasSubmissionsTable) {
                         <li class="submission-item <?= $s['status'] === 'graded' ? 'graded' : '' ?>">
                             <strong><?= htmlspecialchars($s['module_title'] ?? 'Unknown Module') ?></strong>
                             <div class="status-line">
-                                <span>Status: <span class="status-<?= htmlspecialchars($s['status']) ?>"><?= htmlspecialchars(ucfirst($s['status'])) ?></span></span>
+                                <?php
+                                    $statusLabel = ucfirst($s['status']);
+                                    if ($s['status'] === 'submitted') $statusLabel = 'Awaiting Teacher';
+                                ?>
+                                <span>Status: <span class="status-<?= htmlspecialchars($s['status']) ?>"><?= htmlspecialchars($statusLabel) ?></span></span>
                                 <?php if ($s['status'] === 'graded' && $s['grade'] !== null && $s['grade'] !== ''): ?>
                                     <span class="grade-badge">Grade: <?= htmlspecialchars($s['grade']) ?></span>
                                 <?php endif; ?>

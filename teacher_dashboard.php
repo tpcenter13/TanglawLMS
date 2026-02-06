@@ -11,12 +11,68 @@ $teacher_id = $_SESSION['loggedUser']['id'];
 $section = $_GET['section'] ?? 'dashboard';
 $message = '';
 
+function isPdfUpload($file) {
+    if (!isset($file['tmp_name']) || !is_file($file['tmp_name'])) {
+        return false;
+    }
+    $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+    if ($ext !== 'pdf') {
+        return false;
+    }
+    if (function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo) {
+            $mime = finfo_file($finfo, $file['tmp_name']);
+            finfo_close($finfo);
+            $allowed = ['application/pdf', 'application/x-pdf', 'application/octet-stream'];
+            if (!in_array($mime, $allowed, true)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+function tableExists($conn, $table) {
+    $resCheck = $conn->query("SHOW TABLES LIKE '$table'");
+    return $resCheck && $resCheck->num_rows > 0;
+}
+
+function columnExists($conn, $table, $column) {
+    $tableSafe = str_replace('`', '', $table);
+    $colSafe = $conn->real_escape_string($column);
+    $sql = "SHOW COLUMNS FROM `{$tableSafe}` LIKE '{$colSafe}'";
+    $res = $conn->query($sql);
+    return $res && $res->num_rows > 0;
+}
+
+
+function ensureModuleApprovalSchema($conn) {
+    if (!columnExists($conn, 'modules', 'approval_status')) {
+        $conn->query("ALTER TABLE modules ADD COLUMN approval_status VARCHAR(20) NOT NULL DEFAULT 'approved'");
+    }
+    if (!columnExists($conn, 'modules', 'approved_by')) {
+        $conn->query("ALTER TABLE modules ADD COLUMN approved_by INT NULL");
+    }
+    if (!columnExists($conn, 'modules', 'approved_at')) {
+        $conn->query("ALTER TABLE modules ADD COLUMN approved_at TIMESTAMP NULL DEFAULT NULL");
+    }
+}
+
+ensureModuleApprovalSchema($conn);
+if (tableExists($conn, 'activity_submissions')) {
+    $conn->query("UPDATE activity_submissions SET status = 'submitted' WHERE status = 'forwarded'");
+}
+
 // Handle module upload
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
     
     if ($action == 'upload_module') {
         if (isset($_FILES['module_file'])) {
+            if (!isPdfUpload($_FILES['module_file'])) {
+                $message = 'Module uploads must be PDF files only.';
+            } else {
             $filename = $_FILES['module_file']['name'];
             $tmpname = $_FILES['module_file']['tmp_name'];
             $upload_dir = 'uploads/modules/';
@@ -43,18 +99,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 $module_order = isset($_POST['module_order']) ? intval($_POST['module_order']) : 0;
                 if ($module_order <= 0) {
                     if ($teacher_school !== null) {
-                        $orderStmt = $conn->prepare("SELECT COALESCE(MAX(module_order),0) + 1 AS next_order FROM modules WHERE grade_level_id = ? AND school = ?");
+                        $orderStmt = $conn->prepare("SELECT COALESCE(MAX(module_order),0) + 1 AS next_order FROM modules WHERE grade_level_id = ? AND subject_id = ? AND school = ?");
                         if ($orderStmt) {
-                            $orderStmt->bind_param("is", $grade_level_id, $teacher_school);
+                            $orderStmt->bind_param("iis", $grade_level_id, $subject_id, $teacher_school);
                             $orderStmt->execute();
                             $orderRes = $orderStmt->get_result()->fetch_assoc();
                             $module_order = (int)($orderRes['next_order'] ?? 1);
                             $orderStmt->close();
                         }
                     } else {
-                        $orderStmt = $conn->prepare("SELECT COALESCE(MAX(module_order),0) + 1 AS next_order FROM modules WHERE grade_level_id = ?");
+                        $orderStmt = $conn->prepare("SELECT COALESCE(MAX(module_order),0) + 1 AS next_order FROM modules WHERE grade_level_id = ? AND subject_id = ?");
                         if ($orderStmt) {
-                            $orderStmt->bind_param("i", $grade_level_id);
+                            $orderStmt->bind_param("ii", $grade_level_id, $subject_id);
                             $orderStmt->execute();
                             $orderRes = $orderStmt->get_result()->fetch_assoc();
                             $module_order = (int)($orderRes['next_order'] ?? 1);
@@ -78,11 +134,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     $checkStmt->close();
                 } else {
                     // Module doesn't exist - proceed with insertion
-                    $stmt = $conn->prepare("INSERT INTO modules (title, subject_id, grade_level_id, module_order, file_path, teacher_id, school) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $stmt = $conn->prepare("INSERT INTO modules (title, subject_id, grade_level_id, module_order, file_path, teacher_id, school, approval_status) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')");
                     $stmt->bind_param("siiisis", $title, $subject_id, $grade_level_id, $module_order, $filepath, $teacher_id, $teacher_school);
                     
                     if ($stmt->execute()) {
-                        $message = '✅ Module uploaded successfully';
+                        $message = '✅ Module uploaded successfully and is pending facilitator approval';
                     } else {
                         $message = '❌ Error saving module';
                     }
@@ -91,6 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 }
             } else {
                 $message = '❌ Error uploading file';
+            }
             }
         }
     }
@@ -131,13 +188,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         $grade = $_POST['grade'];
         $comments = $_POST['comments'];
         
-        $stmt = $conn->prepare("UPDATE activity_submissions SET grade = ?, comments = ?, status = 'graded' WHERE id = ?");
-        $stmt->bind_param("dsi", $grade, $comments, $submission_id);
-        
-        if ($stmt->execute()) {
-            $message = '✅ Grade submitted successfully';
+        $stmt = $conn->prepare("UPDATE activity_submissions SET grade = ?, comments = ?, status = 'graded' WHERE id = ? AND status = 'submitted'");
+        $stmt->bind_param('dsi', $grade, $comments, $submission_id);
+
+        if ($stmt->execute() && $stmt->affected_rows > 0) {
+            $message = 'Grade submitted successfully';
         } else {
-            $message = '❌ Error grading submission';
+            $message = 'Submission is not yet submitted by the student.';
         }
         $stmt->close();
     }
@@ -182,7 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         $module_order = isset($_POST['module_order']) ? intval($_POST['module_order']) : 0;
 
         // Verify ownership
-        $stmt = $conn->prepare("SELECT file_path, teacher_id, module_order FROM modules WHERE id = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT file_path, teacher_id, module_order, approval_status FROM modules WHERE id = ? LIMIT 1");
         if ($stmt) {
             $stmt->bind_param('i', $module_id);
             $stmt->execute();
@@ -195,25 +252,40 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     $module_order = (int)($res['module_order'] ?? 0);
                 }
                 // Handle optional new file
+                $fileUploadOk = true;
+                $resetApproval = false;
                 if (!empty($_FILES['edit_module_file']['tmp_name'])) {
-                    $upload_dir = 'uploads/modules/';
-                    if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-                    $fname = time() . '_' . basename($_FILES['edit_module_file']['name']);
-                    $target = $upload_dir . $fname;
-                    if (@move_uploaded_file($_FILES['edit_module_file']['tmp_name'], $target)) {
-                        $newPath = $target;
-                        if (!empty($oldPath) && file_exists($oldPath)) {@unlink($oldPath);} 
+                    if (!isPdfUpload($_FILES['edit_module_file'])) {
+                        $message = 'Module uploads must be PDF files only.';
+                        $fileUploadOk = false;
+                    } else {
+                        $upload_dir = 'uploads/modules/';
+                        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+                        $fname = time() . '_' . basename($_FILES['edit_module_file']['name']);
+                        $target = $upload_dir . $fname;
+                        if (@move_uploaded_file($_FILES['edit_module_file']['tmp_name'], $target)) {
+                            $newPath = $target;
+                            if (!empty($oldPath) && file_exists($oldPath)) {@unlink($oldPath);} 
+                            $resetApproval = true;
+                        }
                     }
                 }
 
-                $updateStmt = $conn->prepare("UPDATE modules SET title = ?, subject_id = ?, grade_level_id = ?, module_order = ?, file_path = ? WHERE id = ? AND teacher_id = ?");
-                $updateStmt->bind_param('siiisii', $title, $subject_id, $grade_level_id, $module_order, $newPath, $module_id, $teacher_id);
-                if ($updateStmt->execute()) {
-                    $message = '✅ Module updated successfully';
-                } else {
-                    $message = '❌ Failed to update module';
+                if ($fileUploadOk) {
+                    if ($resetApproval) {
+                        $updateStmt = $conn->prepare("UPDATE modules SET title = ?, subject_id = ?, grade_level_id = ?, module_order = ?, file_path = ?, approval_status = 'pending', approved_by = NULL, approved_at = NULL WHERE id = ? AND teacher_id = ?");
+                        $updateStmt->bind_param('siiisii', $title, $subject_id, $grade_level_id, $module_order, $newPath, $module_id, $teacher_id);
+                    } else {
+                        $updateStmt = $conn->prepare("UPDATE modules SET title = ?, subject_id = ?, grade_level_id = ?, module_order = ?, file_path = ? WHERE id = ? AND teacher_id = ?");
+                        $updateStmt->bind_param('siiisii', $title, $subject_id, $grade_level_id, $module_order, $newPath, $module_id, $teacher_id);
+                    }
+                    if ($updateStmt->execute()) {
+                        $message = 'Module updated successfully';
+                    } else {
+                        $message = 'Failed to update module';
+                    }
+                    $updateStmt->close();
                 }
-                $updateStmt->close();
             } else {
                 $message = '❌ Module not found or permission denied';
             }
@@ -326,11 +398,24 @@ $activity_sheets = $conn->query("SELECT a.*, m.title as module_title FROM activi
 $submissions = $conn->query("SELECT s.*, det.name, m.title as module_title FROM activity_submissions s 
     JOIN detainees det ON s.student_id = det.id 
     JOIN modules m ON s.module_id = m.id 
+    WHERE s.status IN ('submitted', 'graded')
     ORDER BY s.submitted_at DESC")->fetch_all(MYSQLI_ASSOC);
 
 $subjects = $conn->query("SELECT * FROM subjects WHERE archived = 0 ORDER BY title")->fetch_all(MYSQLI_ASSOC);
 $grade_levels = $conn->query("SELECT * FROM grade_levels WHERE archived = 0 ORDER BY level")->fetch_all(MYSQLI_ASSOC);
 $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY name")->fetch_all(MYSQLI_ASSOC);
+
+$pendingModulesCount = count(array_filter($modules, function($m) {
+    return ($m['approval_status'] ?? 'approved') === 'pending';
+}));
+$pendingSubmissions = count(array_filter($submissions, function($s) {
+    return ($s['status'] ?? '') === 'submitted';
+}));
+$gradedSubmissions = count(array_filter($submissions, function($s) {
+    return ($s['status'] ?? '') === 'graded';
+}));
+$recentModules = array_slice($modules, 0, 5);
+$recentSubmissions = array_slice($submissions, 0, 5);
 
 ?>
 <!doctype html>
@@ -436,6 +521,33 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
             margin-top: 0;
             margin-bottom: 24px;
         }
+        .plain-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .plain-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .plain-list li:last-child {
+            border-bottom: none;
+        }
+        .list-meta {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            background: #e2e8f0;
+            color: #1f2937;
+        }
         .section .card {
             margin-top: 0;
             margin-bottom: 20px;
@@ -453,7 +565,8 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
             border: 1px solid #d1d5db;
             border-radius: 10px;
         }
-        button[type="submit"] {
+        button[type="submit"],
+        .btn-primary {
             background: var(--portal-primary) !important;
             color: white !important;
             padding: 10px 20px;
@@ -463,12 +576,14 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
             font-weight: 600;
             transition: all 0.2s ease;
         }
-        button[type="submit"]:hover { 
+        button[type="submit"]:hover,
+        .btn-primary:hover { 
             background: var(--portal-primary-2) !important; 
             transform: translateY(-1px);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
         }
-        button[type="submit"]:active {
+        button[type="submit"]:active,
+        .btn-primary:active {
             transform: translateY(0);
         }
         .alert { padding: 12px; border-radius: 6px; margin-bottom: 15px; }
@@ -563,6 +678,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
 
     <!-- DASHBOARD SECTION -->
     <div class="section <?= $section == 'dashboard' ? 'active' : '' ?>">
+        <h2>Quick Overview</h2>
         <div class="grid">
             <div class="card">
                 <div class="kpi"><?= count($modules) ?></div>
@@ -573,12 +689,64 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
                 <p class="small">📄 Activity Sheets</p>
             </div>
             <div class="card">
-                <div class="kpi"><?= count(array_filter($submissions, fn($s) => $s['status'] == 'pending')) ?></div>
+                <div class="kpi"><?= $pendingSubmissions ?></div>
                 <p class="small">⏳ Pending Submissions</p>
             </div>
             <div class="card">
-                <div class="kpi"><?= count(array_filter($submissions, fn($s) => $s['status'] == 'graded')) ?></div>
+                <div class="kpi"><?= $gradedSubmissions ?></div>
                 <p class="small">✅ Graded</p>
+            </div>
+            <div class="card">
+                <div class="kpi"><?= $pendingModulesCount ?></div>
+                <p class="small">🧾 Modules Pending Approval</p>
+            </div>
+        </div>
+
+        <h2 style="margin-top:24px;">Recent Activity</h2>
+        <div class="grid">
+            <div class="card">
+                <h3>Recent Modules</h3>
+                <?php if (!empty($recentModules)): ?>
+                    <ul class="plain-list">
+                        <?php foreach ($recentModules as $mod): ?>
+                            <li>
+                                <strong><?= htmlspecialchars($mod['title']) ?></strong>
+                                <div class="list-meta">
+                                    <?= htmlspecialchars($mod['subject_title'] ?? 'Unknown Subject') ?> • <?= htmlspecialchars($mod['level'] ?? 'N/A') ?>
+                                </div>
+                                <div class="list-meta">
+                                    <?= date('M d, Y', strtotime($mod['uploaded_at'])) ?>
+                                    <?php if (!empty($mod['approval_status'])): ?>
+                                        • <span class="status-chip"><?= htmlspecialchars(ucfirst($mod['approval_status'])) ?></span>
+                                    <?php endif; ?>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p>No modules yet.</p>
+                <?php endif; ?>
+            </div>
+            <div class="card">
+                <h3>Recent Submissions</h3>
+                <?php if (!empty($recentSubmissions)): ?>
+                    <ul class="plain-list">
+                        <?php foreach ($recentSubmissions as $sub): ?>
+                            <li>
+                                <strong><?= htmlspecialchars($sub['name']) ?></strong>
+                                <div class="list-meta">
+                                    <?= htmlspecialchars($sub['module_title'] ?? 'Module') ?>
+                                </div>
+                                <div class="list-meta">
+                                    <?= date('M d, Y H:i', strtotime($sub['submitted_at'])) ?> •
+                                    <span class="status-chip"><?= htmlspecialchars(ucfirst($sub['status'])) ?></span>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p>No submissions yet.</p>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -623,8 +791,8 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
                 </div>
                 <div class="form-row full">
                     <div class="form-group">
-                        <label>Upload File (PDF, DOC, etc.)</label>
-                        <input type="file" name="module_file" required accept=".pdf,.doc,.docx,.ppt,.pptx">
+                        <label>Upload File (PDF only)</label>
+                        <input type="file" name="module_file" required accept=".pdf">
                     </div>
                 </div>
                 <button type="submit">Upload Module</button>
@@ -639,6 +807,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
                     <th>Title</th>
                     <th>Subject</th>
                     <th>Grade Level</th>
+                    <th>Approval</th>
                     <th>Uploaded</th>
                     <th>Actions</th>
                 </tr>
@@ -650,6 +819,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
                     <td><?= htmlspecialchars($mod['title']) ?></td>
                     <td><?= htmlspecialchars($mod['subject_title'] ?? 'N/A') ?></td>
                     <td><?= htmlspecialchars($mod['level'] ?? 'N/A') ?></td>
+                    <td><?= htmlspecialchars(ucfirst($mod['approval_status'] ?? 'approved')) ?></td>
                     <td><?= date('M d, Y', strtotime($mod['uploaded_at'])) ?></td>
                     <td style="white-space:nowrap">
                         <button type="button" class="btn btn-edit" onclick='openEditModule(<?= json_encode($mod, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT) ?>)' aria-label="Edit module <?= htmlspecialchars($mod['title']) ?>" title="Edit">✏️ Edit</button>
@@ -741,8 +911,8 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
                 </div>
                     <div class="form-row full">
                         <div class="form-group">
-                            <label>Replace File (optional)</label>
-                            <input type="file" name="edit_module_file" id="edit_module_file" accept=".pdf,.doc,.docx,.ppt,.pptx">
+                        <label>Replace File (optional, PDF only)</label>
+                        <input type="file" name="edit_module_file" id="edit_module_file" accept=".pdf">
                         </div>
                     </div>
                     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:10px;">
@@ -825,6 +995,7 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
                 <tr>
                     <th>Detainee</th>
                     <th>Module</th>
+                    <th>File</th>
                     <th>Submitted</th>
                     <th>Status</th>
                     <th>Grade</th>
@@ -835,6 +1006,13 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
                 <tr>
                     <td><?= htmlspecialchars($sub['name']) ?></td>
                     <td><?= htmlspecialchars($sub['module_title']) ?></td>
+                    <td>
+                        <?php if (!empty($sub['file_path'])): ?>
+                            <a href="<?= htmlspecialchars($sub['file_path']) ?>" target="_blank" rel="noopener">Preview</a>
+                        <?php else: ?>
+                            <span>-</span>
+                        <?php endif; ?>
+                    </td>
                     <td><?= date('M d, Y H:i', strtotime($sub['submitted_at'])) ?></td>
                     <td><strong><?= ucfirst($sub['status']) ?></strong></td>
                     <td><?= $sub['grade'] ?? '-' ?></td>
@@ -855,14 +1033,21 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
                 <div class="form-row">
                     <div class="form-group">
                         <label>Submission</label>
-                        <select name="submission_id" required>
+                        <select name="submission_id" id="submission_id" required>
                             <option value="">Select Submission</option>
                             <?php foreach($submissions as $sub): ?>
                             <?php if ($sub['status'] != 'graded'): ?>
-                            <option value="<?= $sub['id'] ?>"><?= htmlspecialchars($sub['name'] . ' - ' . $sub['module_title']) ?></option>
+                            <option value="<?= $sub['id'] ?>" data-file="<?= htmlspecialchars($sub['file_path'] ?? '') ?>">
+                                <?= htmlspecialchars($sub['name'] . ' - ' . $sub['module_title']) ?>
+                            </option>
                             <?php endif; ?>
                             <?php endforeach; ?>
                         </select>
+                        <div style="margin-top:8px;">
+                            <a href="#" id="viewSubmissionLink" target="_blank" rel="noopener" style="display:none;text-decoration:none;">
+                                <button type="button" class="btn-primary">View Activity</button>
+                            </a>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Grade (0-100)</label>
@@ -954,6 +1139,24 @@ $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY n
     document.addEventListener('DOMContentLoaded', function(){
         document.body.classList.remove('sidebar-open');
         document.body.classList.remove('sidebar-collapsed');
+
+        const submissionSelect = document.getElementById('submission_id');
+        const viewLink = document.getElementById('viewSubmissionLink');
+        if (submissionSelect && viewLink) {
+            const updateViewLink = () => {
+                const opt = submissionSelect.options[submissionSelect.selectedIndex];
+                const file = opt ? opt.getAttribute('data-file') : '';
+                if (file) {
+                    viewLink.href = file;
+                    viewLink.style.display = 'inline-block';
+                } else {
+                    viewLink.href = '#';
+                    viewLink.style.display = 'none';
+                }
+            };
+            submissionSelect.addEventListener('change', updateViewLink);
+            updateViewLink();
+        }
 
         const moduleUploadForm = document.querySelector('form input[name="action"][value="upload_module"]')?.closest('form');
         if (moduleUploadForm) {
