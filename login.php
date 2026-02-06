@@ -1,162 +1,219 @@
 <?php
+// ============================================
+// INLINE PASSWORD RESET HANDLER
+// ============================================
+if (isset($_POST['ajax_reset']) && $_POST['ajax_reset'] === '1') {
+    ob_start();
+    header('Content-Type: application/json');
+    
+    // Database connection - update these with your credentials
+    $db_host = 'localhost';
+    $db_user = 'root';           // ← UPDATE THIS
+    $db_pass = '';               // ← UPDATE THIS
+    $db_name = 'tanglaw_lms';    // ← UPDATE THIS
+    
+    try {
+        $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+        
+        if ($conn->connect_error) {
+            throw new Exception('Database connection failed');
+        }
+        
+        $email = trim($_POST['email'] ?? '');
+        $role = trim($_POST['role'] ?? '');
+        
+        // Validate
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new Exception('Invalid email address');
+        }
+        
+        if (!in_array($role, ['teacher', 'facilitator', 'detainee'])) {
+            throw new Exception('Invalid role');
+        }
+        
+        // Find user
+        $table = $role . 's';
+        $stmt = $conn->prepare("SELECT id, name, email FROM $table WHERE email = ? AND archived = 0 LIMIT 1");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows === 0) {
+            ob_end_clean();
+            echo json_encode([
+                'success' => true,
+                'send_email' => false,
+                'message' => 'If an account exists, a reset link has been sent.'
+            ]);
+            exit;
+        }
+        
+        $user = $result->fetch_assoc();
+        
+        // Create password_resets table if not exists
+        $conn->query("
+            CREATE TABLE IF NOT EXISTS password_resets (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_role VARCHAR(20) NOT NULL,
+                user_id INT NOT NULL,
+                token VARCHAR(255) NOT NULL UNIQUE,
+                expires_at DATETIME NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ");
+        
+        // Generate token
+        $token = bin2hex(random_bytes(32));
+        $expires_at = date('Y-m-d H:i:s', strtotime('+1 hour'));
+        
+        // Delete old tokens for this user
+        $del_stmt = $conn->prepare("DELETE FROM password_resets WHERE user_role = ? AND user_id = ?");
+        $del_stmt->bind_param("si", $role, $user['id']);
+        $del_stmt->execute();
+        
+        // Insert new token
+        $ins_stmt = $conn->prepare("INSERT INTO password_resets (user_role, user_id, token, expires_at) VALUES (?, ?, ?, ?)");
+        $ins_stmt->bind_param("siss", $role, $user['id'], $token, $expires_at);
+        $ins_stmt->execute();
+        
+        // Build reset link - use simple approach
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'];
+        
+        // Get current page URL and replace login.php with reset_password.php
+        $current_url = $_SERVER['PHP_SELF'];
+        $base_path = str_replace('\\', '/', dirname($current_url));
+        
+        // Ensure proper path format
+        if ($base_path === '/' || $base_path === '.') {
+            $reset_link = $protocol . '://' . $host . '/reset_password.php?token=' . $token;
+        } else {
+            // Remove trailing slash and add our file
+            $base_path = rtrim($base_path, '/');
+            $reset_link = $protocol . '://' . $host . $base_path . '/reset_password.php?token=' . $token;
+        }
+        
+        // Extra safety: replace any remaining backslashes
+        $reset_link = str_replace('\\', '/', $reset_link);
+        
+        ob_end_clean();
+        echo json_encode([
+            'success' => true,
+            'send_email' => true,
+            'email' => $user['email'],
+            'name' => $user['name'],
+            'reset_link' => $reset_link,
+            'debug' => [
+                'protocol' => $protocol,
+                'host' => $host,
+                'base_path' => $base_path,
+                'current_url' => $current_url,
+                'final_link' => $reset_link
+            ]
+        ]);
+        exit;
+        
+    } catch (Exception $e) {
+        ob_end_clean();
+        echo json_encode([
+            'success' => false,
+            'message' => $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+// ============================================
+// NORMAL LOGIN HANDLING
+// ============================================
 session_start();
 include("conn.php");
 
 $error = "";
 $success = "";
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (isset($_POST['action']) && $_POST['action'] === 'forgot') {
-        $forgot_email = trim($_POST['forgot_email'] ?? '');
-        $forgot_role = trim($_POST['forgot_role'] ?? '');
-        
-        if (empty($forgot_email) || empty($forgot_role)) {
-            $error = '❌ Please provide your email and role for password assistance.';
-        } else {
-            if (!filter_var($forgot_email, FILTER_VALIDATE_EMAIL)) {
-                $error = '❌ Please provide a valid email address.';
-            } else {
-                $user_exists = false;
-                $user_id = null;
-                
-                if ($forgot_role == 'teacher') {
-                    $stmt = $conn->prepare("SELECT id, email FROM teachers WHERE email = ? AND archived = 0 LIMIT 1");
-                } elseif ($forgot_role == 'facilitator') {
-                    $stmt = $conn->prepare("SELECT id, email FROM facilitators WHERE email = ? AND archived = 0 LIMIT 1");
-                } else {
-                    $stmt = $conn->prepare("SELECT id, email FROM detainees WHERE email = ? AND archived = 0 LIMIT 1");
-                }
-                
-                if ($stmt) {
-                    $stmt->bind_param("s", $forgot_email);
-                    $stmt->execute();
-                    $result = $stmt->get_result();
-                    
-                    if ($result->num_rows > 0) {
-                        $user_data = $result->fetch_assoc();
-                        $user_exists = true;
-                        $user_id = $user_data['id'];
-                    }
-                    $stmt->close();
-                }
-                
-                if (!$user_exists) {
-                    $error = '❌ No ' . htmlspecialchars($forgot_role) . ' account found with this email address.';
-                } else {
-                    $insert_stmt = $conn->prepare("INSERT INTO password_reset_requests (email, role, user_id, status) VALUES (?, ?, ?, 'pending')");
-                    
-                    if ($insert_stmt) {
-                        $insert_stmt->bind_param("ssi", $forgot_email, $forgot_role, $user_id);
-                        
-                        if ($insert_stmt->execute()) {
-                            $success = '✅ Your password reset request has been sent to the administrator. They will contact you via email soon.';
-                        } else {
-                            $error = '❌ Failed to submit request. Please try again.';
-                        }
-                        
-                        $insert_stmt->close();
-                    } else {
-                        $error = '❌ System error. Please contact support.';
-                    }
-                }
-            }
-        }
-    }
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && (!isset($_POST['action']) || $_POST['action'] !== 'forgot')) {
+    $username = trim($_POST['username'] ?? '');
+    $password = trim($_POST['password'] ?? '');
     
-    if (!isset($_POST['action']) || $_POST['action'] !== 'forgot') {
-        $username = trim($_POST['username'] ?? '');
-        $password = trim($_POST['password'] ?? '');
+    if (empty($username) || empty($password)) {
+        $error = "❌ Please fill in all required fields.";
+    } else {
+        $redirect_url = '';
+        $found_user = false;
         
-        if (empty($username) || empty($password)) {
-            $error = "❌ Please fill in all required fields.";
-        } else {
-            $redirect_url = '';
-            $found_user = false;
-            
-            // Check if admin
-            if ($username === 'admin' && $password === 'admin123') {
-                $_SESSION['loggedUser'] = [
-                    'id' => 0,
-                    'name' => 'Administrator',
-                    'role' => 'admin'
-                ];
-                $redirect_url = 'admin_dashboard.php';
-                $found_user = true;
-            }
-            
-            // Check if teacher
-            if (!$found_user) {
-                $stmt = $conn->prepare("SELECT id, name, password FROM teachers WHERE id_number = ? AND archived = 0 LIMIT 1");
-                if ($stmt) {
-                    $stmt->bind_param("s", $username);
-                    $stmt->execute();
-                    $stmt->bind_result($t_id, $t_name, $t_hash);
-                    if ($stmt->fetch()) {
-                        if (!empty($t_hash)) {
-                            if (password_verify($password, $t_hash)) {
-                                $_SESSION['loggedUser'] = [ 'id' => $t_id, 'name' => $t_name, 'role' => 'teacher' ];
-                                $redirect_url = 'teacher_dashboard.php';
-                                $found_user = true;
-                            }
-                        } else {
+        // Check if admin
+        if ($username === 'admin' && $password === 'admin123') {
+            $_SESSION['loggedUser'] = [
+                'id' => 0,
+                'name' => 'Administrator',
+                'role' => 'admin'
+            ];
+            $redirect_url = 'admin_dashboard.php';
+            $found_user = true;
+        }
+        
+        // Check if teacher
+        if (!$found_user) {
+            $stmt = $conn->prepare("SELECT id, name, password FROM teachers WHERE id_number = ? AND archived = 0 LIMIT 1");
+            if ($stmt) {
+                $stmt->bind_param("s", $username);
+                $stmt->execute();
+                $stmt->bind_result($t_id, $t_name, $t_hash);
+                if ($stmt->fetch()) {
+                    if (!empty($t_hash)) {
+                        if (password_verify($password, $t_hash)) {
                             $_SESSION['loggedUser'] = [ 'id' => $t_id, 'name' => $t_name, 'role' => 'teacher' ];
                             $redirect_url = 'teacher_dashboard.php';
                             $found_user = true;
                         }
+                    } else {
+                        $_SESSION['loggedUser'] = [ 'id' => $t_id, 'name' => $t_name, 'role' => 'teacher' ];
+                        $redirect_url = 'teacher_dashboard.php';
+                        $found_user = true;
                     }
-                    $stmt->close();
                 }
+                $stmt->close();
             }
-            
-            // Check if facilitator
-            if (!$found_user) {
-                $stmt = $conn->prepare("SELECT id, name, password FROM facilitators WHERE id_number = ? AND archived = 0 LIMIT 1");
-                if ($stmt) {
-                    $stmt->bind_param("s", $username);
-                    $stmt->execute();
-                    $stmt->bind_result($f_id, $f_name, $f_hash);
-                    if ($stmt->fetch()) {
-                        if (!empty($f_hash)) {
-                            if (password_verify($password, $f_hash)) {
-                                $_SESSION['loggedUser'] = [ 'id' => $f_id, 'name' => $f_name, 'role' => 'facilitator' ];
-                                $redirect_url = 'facilitator_dashboard.php';
-                                $found_user = true;
-                            }
-                        } else {
+        }
+        
+        // Check if facilitator
+        if (!$found_user) {
+            $stmt = $conn->prepare("SELECT id, name, password FROM facilitators WHERE id_number = ? AND archived = 0 LIMIT 1");
+            if ($stmt) {
+                $stmt->bind_param("s", $username);
+                $stmt->execute();
+                $stmt->bind_result($f_id, $f_name, $f_hash);
+                if ($stmt->fetch()) {
+                    if (!empty($f_hash)) {
+                        if (password_verify($password, $f_hash)) {
                             $_SESSION['loggedUser'] = [ 'id' => $f_id, 'name' => $f_name, 'role' => 'facilitator' ];
                             $redirect_url = 'facilitator_dashboard.php';
                             $found_user = true;
                         }
+                    } else {
+                        $_SESSION['loggedUser'] = [ 'id' => $f_id, 'name' => $f_name, 'role' => 'facilitator' ];
+                        $redirect_url = 'facilitator_dashboard.php';
+                        $found_user = true;
                     }
-                    $stmt->close();
                 }
+                $stmt->close();
             }
-            
-            // Check if detainee
-            if (!$found_user) {
-                $stmt = $conn->prepare("SELECT d.id, d.name, d.grade_level, d.school, gl.id AS grade_level_id, d.password
-                    FROM detainees d
-                    LEFT JOIN grade_levels gl ON gl.level = d.grade_level
-                    WHERE d.id_number = ? AND d.archived = 0 LIMIT 1");
-                if ($stmt) {
-                    $stmt->bind_param("s", $username);
-                    $stmt->execute();
-                    $stmt->bind_result($d_id, $d_name, $d_grade_level, $d_school, $d_grade_level_id, $d_hash);
-                    if ($stmt->fetch()) {
-                        if (!empty($d_hash)) {
-                            if (password_verify($password, $d_hash)) {
-                                $_SESSION['loggedUser'] = [
-                                    'id' => $d_id,
-                                    'name' => $d_name,
-                                    'grade_level' => $d_grade_level,
-                                    'grade_level_id' => $d_grade_level_id ? (int)$d_grade_level_id : null,
-                                    'school' => $d_school,
-                                    'role' => 'detainee'
-                                ];
-                                $redirect_url = 'student_dashboard.php';
-                                $found_user = true;
-                            }
-                        } else {
+        }
+        
+        // Check if detainee
+        if (!$found_user) {
+            $stmt = $conn->prepare("SELECT d.id, d.name, d.grade_level, d.school, gl.id AS grade_level_id, d.password
+                FROM detainees d
+                LEFT JOIN grade_levels gl ON gl.level = d.grade_level
+                WHERE d.id_number = ? AND d.archived = 0 LIMIT 1");
+            if ($stmt) {
+                $stmt->bind_param("s", $username);
+                $stmt->execute();
+                $stmt->bind_result($d_id, $d_name, $d_grade_level, $d_school, $d_grade_level_id, $d_hash);
+                if ($stmt->fetch()) {
+                    if (!empty($d_hash)) {
+                        if (password_verify($password, $d_hash)) {
                             $_SESSION['loggedUser'] = [
                                 'id' => $d_id,
                                 'name' => $d_name,
@@ -168,18 +225,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             $redirect_url = 'student_dashboard.php';
                             $found_user = true;
                         }
+                    } else {
+                        $_SESSION['loggedUser'] = [
+                            'id' => $d_id,
+                            'name' => $d_name,
+                            'grade_level' => $d_grade_level,
+                            'grade_level_id' => $d_grade_level_id ? (int)$d_grade_level_id : null,
+                            'school' => $d_school,
+                            'role' => 'detainee'
+                        ];
+                        $redirect_url = 'student_dashboard.php';
+                        $found_user = true;
                     }
-                    $stmt->close();
                 }
+                $stmt->close();
             }
-            
-            if ($found_user) {
-                $success = "Login successful! Redirecting...";
-                header("refresh:1.5;url=$redirect_url");
-            } else {
-                $error = "❌ Invalid username or password.";
-                error_log("Login failed for username={$username}");
-            }
+        }
+        
+        if ($found_user) {
+            $success = "Login successful! Redirecting...";
+            header("refresh:1.5;url=$redirect_url");
+        } else {
+            $error = "❌ Invalid username or password.";
+            error_log("Login failed for username={$username}");
         }
     }
 }
@@ -195,6 +263,10 @@ $conn->close();
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- EmailJS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -382,6 +454,12 @@ $conn->close();
             border: 1px solid #a7f3d0;
         }
         
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+        
         .form-group {
             margin-bottom: 24px;
         }
@@ -487,6 +565,11 @@ $conn->close();
             transform: translateY(0);
         }
         
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
         .forgot-link {
             text-align: center;
             margin-top: 20px;
@@ -590,6 +673,12 @@ $conn->close();
         .btn-submit:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5);
+        }
+        
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
         
         .info-box {
@@ -721,14 +810,13 @@ $conn->close();
     </div>
 </div>
 
+<!-- Forgot Password Modal -->
 <div id="forgotModal" class="modal">
     <div class="modal-content">
         <h3>🔐 Reset Password</h3>
-        <p class="subtitle">Enter your details to request a password reset</p>
+        <p class="subtitle">Enter your details to receive a password reset link</p>
         
-        <form method="POST" id="forgotForm">
-            <input type="hidden" name="action" value="forgot">
-            
+        <form id="forgotForm" onsubmit="handleForgotPassword(event)">
             <div class="form-group">
                 <label for="forgot_role">Your Role</label>
                 <select name="forgot_role" id="forgot_role" required>
@@ -754,18 +842,28 @@ $conn->close();
             
             <div class="info-box">
                 <span>ℹ️</span>
-                <p>Your password reset request will be sent to the administrator. They will contact you via email with further instructions.</p>
+                <p>A password reset link will be sent to your email address. The link will expire in 1 hour.</p>
             </div>
+            
+            <div id="resetStatusMessage" style="display: none; margin-top: 15px;"></div>
             
             <div class="modal-buttons">
                 <button type="button" class="btn-cancel" onclick="closeForgotModal()">Cancel</button>
-                <button type="submit" class="btn-submit">Send Request</button>
+                <button type="submit" class="btn-submit" id="forgotSubmitBtn">Send Reset Link</button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
+// EmailJS Configuration
+const EMAILJS_PUBLIC_KEY = "bjKEcCXpriGPTWoIB";
+const EMAILJS_SERVICE_ID = "service_4viy27k";
+const EMAILJS_TEMPLATE_ID = "template_1axzswl";
+
+// Initialize EmailJS
+emailjs.init(EMAILJS_PUBLIC_KEY);
+
 function togglePassword() {
     const pwd = document.getElementById("password");
     const icon = document.getElementById("eyeIcon");
@@ -791,6 +889,118 @@ function openForgotModal() {
 
 function closeForgotModal() {
     document.getElementById('forgotModal').classList.remove('show');
+    // Reset form
+    document.getElementById('forgotForm').reset();
+    document.getElementById('resetStatusMessage').style.display = 'none';
+}
+
+function showMessage(message, type) {
+    const statusDiv = document.getElementById('resetStatusMessage');
+    statusDiv.className = 'alert alert-' + type;
+    statusDiv.innerHTML = '<span>' + message + '</span>';
+    statusDiv.style.display = 'block';
+}
+
+async function handleForgotPassword(event) {
+    event.preventDefault();
+    
+    const submitBtn = document.getElementById('forgotSubmitBtn');
+    const originalText = submitBtn.innerHTML;
+    
+    // Disable button and show loading
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '⏳ Processing...';
+    
+    const formData = new FormData(event.target);
+    const email = formData.get('forgot_email');
+    const role = formData.get('forgot_role');
+    
+    console.log('🔄 Starting password reset for:', email, 'Role:', role);
+    
+    try {
+        // Step 1: Request reset token from server (using same login.php file)
+        console.log('📡 Sending request to server...');
+        
+        const response = await fetch(window.location.pathname, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `ajax_reset=1&email=${encodeURIComponent(email)}&role=${encodeURIComponent(role)}`
+        });
+        
+        console.log('📥 Response status:', response.status);
+        console.log('📥 Response content-type:', response.headers.get('content-type'));
+        
+        // Check if response is actually JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('❌ Server returned non-JSON response:', text.substring(0, 200));
+            showMessage('❌ Server error. Please check console and contact administrator.', 'error');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+            return;
+        }
+        
+        const data = await response.json();
+        console.log('📦 Server response:', data);
+        
+        if (!data.success) {
+            showMessage('❌ ' + data.message, 'error');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+            return;
+        }
+        
+        // Step 2: If email should be sent
+        if (data.send_email) {
+            submitBtn.innerHTML = '📧 Sending email...';
+            console.log('📧 Sending email to:', data.email);
+            console.log('🔗 Reset link:', data.reset_link);
+            
+            if (data.debug) {
+                console.log('🐛 Debug info:', data.debug);
+            }
+            
+            const templateParams = {
+                to_email: data.email,
+                name: data.name,
+                message: data.reset_link,
+                email: data.email,
+                year: new Date().getFullYear()
+            };
+            
+            console.log('📨 EmailJS params:', templateParams);
+            
+            // Send via EmailJS
+            const emailResponse = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+            console.log('✅ Email sent successfully:', emailResponse);
+            
+            showMessage('✅ Password reset link sent successfully! Please check your email.', 'success');
+            
+            // Close modal after 3 seconds
+            setTimeout(() => {
+                closeForgotModal();
+            }, 3000);
+        } else {
+            showMessage('ℹ️ ' + data.message, 'info');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error details:', error);
+        console.error('Error name:', error.name);
+        console.error('Error message:', error.message);
+        
+        if (error.name === 'SyntaxError') {
+            showMessage('❌ Server configuration error. Please contact administrator.', 'error');
+        } else {
+            showMessage('❌ Failed to send reset email. Please try again.', 'error');
+        }
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    }
 }
 
 window.onclick = function(event) {

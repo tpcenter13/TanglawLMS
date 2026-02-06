@@ -1,7 +1,11 @@
 <?php
 session_start();
-require_once 'conn.php';
-require_once 'admin_functions_users.php';
+
+// Database connection - UPDATE THESE
+$db_host = 'localhost';
+$db_user = 'root';           // ← UPDATE THIS
+$db_pass = '';               // ← UPDATE THIS
+$db_name = 'tanglaw_lms';    // ← UPDATE THIS
 
 $message = '';
 $messageType = '';
@@ -9,12 +13,24 @@ $token = $_GET['token'] ?? '';
 $validToken = false;
 $userData = null;
 
+// Connect to database
+try {
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    
+    if ($conn->connect_error) {
+        throw new Exception('Database connection failed');
+    }
+    
+    $conn->set_charset('utf8mb4');
+    
+} catch (Exception $e) {
+    die('Database error. Please contact administrator.');
+}
+
 // Validate token
 if (!empty($token)) {
-    ensurePasswordResetsTable($conn);
-    
-    // Check if token exists (removed the expires_at check from query)
-    $stmt = $conn->prepare("SELECT user_role, user_id, expires_at FROM password_resets WHERE token = ?");
+    // Check if token exists and not expired
+    $stmt = $conn->prepare("SELECT user_role, user_id, expires_at FROM password_resets WHERE token = ? LIMIT 1");
     $stmt->bind_param("s", $token);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -22,7 +38,7 @@ if (!empty($token)) {
     if ($result->num_rows > 0) {
         $tokenData = $result->fetch_assoc();
         
-        // Manual expiry check
+        // Check if expired
         $expiresTimestamp = strtotime($tokenData['expires_at']);
         $nowTimestamp = time();
         
@@ -33,7 +49,7 @@ if (!empty($token)) {
             $role = $tokenData['user_role'];
             $userId = $tokenData['user_id'];
             
-            // Get user info
+            // Get user info based on role
             if ($role === 'teacher') {
                 $table = 'teachers';
             } elseif ($role === 'facilitator') {
@@ -45,21 +61,22 @@ if (!empty($token)) {
             }
             
             if ($table) {
-                $stmt2 = $conn->prepare("SELECT name, email FROM $table WHERE id = ?");
+                $stmt2 = $conn->prepare("SELECT name, email FROM $table WHERE id = ? LIMIT 1");
                 $stmt2->bind_param("i", $userId);
                 $stmt2->execute();
-                $userData = $stmt2->get_result()->fetch_assoc();
-                $stmt2->close();
+                $userResult = $stmt2->get_result();
                 
-                if ($userData) {
-                    $validToken = true;
+                if ($userResult->num_rows > 0) {
+                    $userData = $userResult->fetch_assoc();
                     $userData['role'] = $role;
                     $userData['user_id'] = $userId;
+                    $validToken = true;
                 }
+                $stmt2->close();
             }
         }
     } else {
-        $message = 'Invalid or expired reset link. Please request a new one.';
+        $message = 'Invalid reset link. Please request a new one.';
         $messageType = 'error';
     }
     $stmt->close();
@@ -81,8 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token'])) {
         $message = 'Password must be at least 6 characters';
         $messageType = 'error';
     } else {
-        // Validate token again (without expires_at check in query)
-        $stmt = $conn->prepare("SELECT user_role, user_id, expires_at FROM password_resets WHERE token = ?");
+        // Validate token again
+        $stmt = $conn->prepare("SELECT user_role, user_id, expires_at FROM password_resets WHERE token = ? LIMIT 1");
         $stmt->bind_param("s", $token);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -90,23 +107,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token'])) {
         if ($result->num_rows > 0) {
             $tokenData = $result->fetch_assoc();
             
-            // Check expiry manually
+            // Check expiry
             if (strtotime($tokenData['expires_at']) < time()) {
                 $message = 'This reset link has expired';
                 $messageType = 'error';
             } else {
                 // Update password
-                if (setUserPassword($conn, $tokenData['user_role'], $tokenData['user_id'], $newPassword)) {
-                    // Delete used token
-                    $stmt2 = $conn->prepare("DELETE FROM password_resets WHERE token = ?");
-                    $stmt2->bind_param("s", $token);
-                    $stmt2->execute();
-                    $stmt2->close();
-                    
-                    $message = 'success';
-                    $messageType = 'success';
+                $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+                $role = $tokenData['user_role'];
+                $userId = $tokenData['user_id'];
+                
+                // Determine table
+                if ($role === 'teacher') {
+                    $table = 'teachers';
+                } elseif ($role === 'facilitator') {
+                    $table = 'facilitators';
+                } elseif ($role === 'detainee') {
+                    $table = 'detainees';
                 } else {
-                    $message = 'Error updating password. Please try again.';
+                    $table = '';
+                }
+                
+                if ($table) {
+                    $updateStmt = $conn->prepare("UPDATE $table SET password = ? WHERE id = ?");
+                    $updateStmt->bind_param("si", $hashedPassword, $userId);
+                    
+                    if ($updateStmt->execute()) {
+                        // Delete used token
+                        $deleteStmt = $conn->prepare("DELETE FROM password_resets WHERE token = ?");
+                        $deleteStmt->bind_param("s", $token);
+                        $deleteStmt->execute();
+                        $deleteStmt->close();
+                        
+                        $message = 'success';
+                        $messageType = 'success';
+                    } else {
+                        $message = 'Error updating password. Please try again.';
+                        $messageType = 'error';
+                    }
+                    $updateStmt->close();
+                } else {
+                    $message = 'Invalid user role';
                     $messageType = 'error';
                 }
             }
@@ -232,6 +273,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token'])) {
             transform: translateY(0);
         }
         
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
         .message {
             padding: 12px;
             border-radius: 5px;
@@ -301,7 +347,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token'])) {
                 </div>
             <?php endif; ?>
             <div class="back-link">
-                <a href="request_reset.php">← Request New Reset Link</a>
+                <a href="login.php">← Back to Login</a>
             </div>
         <?php else: ?>
             <div class="logo">
@@ -323,7 +369,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token'])) {
                 </div>
             <?php endif; ?>
             
-            <form method="POST">
+            <form method="POST" id="resetForm">
                 <input type="hidden" name="token" value="<?php echo htmlspecialchars($token); ?>">
                 
                 <div class="form-group">
@@ -340,7 +386,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token'])) {
                     <div class="field-error" id="confirmError" aria-live="polite"></div>
                 </div>
                 
-                <button type="submit" class="btn">
+                <button type="submit" class="btn" id="submitBtn">
                     Reset Password
                 </button>
             </form>
@@ -350,14 +396,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token'])) {
             </div>
         <?php endif; ?>
     </div>
+    
     <script>
         (function () {
-            const form = document.querySelector('form');
+            const form = document.getElementById('resetForm');
             if (!form) return;
 
             const password = document.getElementById('password');
             const confirm = document.getElementById('confirm_password');
-            const submit = form.querySelector('button[type="submit"]');
+            const submit = document.getElementById('submitBtn');
             const passwordError = document.getElementById('passwordError');
             const confirmError = document.getElementById('confirmError');
 
@@ -422,10 +469,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['token'])) {
                 state.confirmTouched = true;
                 validate();
             });
-            form.addEventListener('submit', function () {
+            form.addEventListener('submit', function (e) {
                 state.passwordTouched = true;
                 state.confirmTouched = true;
                 validate();
+                
+                if (!password.value || !confirm.value || password.value !== confirm.value) {
+                    e.preventDefault();
+                }
             });
 
             validate();
