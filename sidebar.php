@@ -32,6 +32,7 @@ $menuItems = [
 } elseif ($role === 'facilitator') {
     $menuItems = [
         'dashboard' => ['label' => 'Dashboard', 'url' => '?section=dashboard'],
+        'approve' => ['label' => 'Approve Modules', 'url' => '?section=approve'],
         'print' => ['label' => 'Print Activities', 'url' => '?section=print'],
         'distribute' => ['label' => 'Distribute', 'url' => '?section=distribute'],
         'collect' => ['label' => 'Collect', 'url' => '?section=collect'],
@@ -77,6 +78,8 @@ function getSidebarIcon($key) {
             return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h18M3 10l4-5M3 10l4 5M21 14H3m18 0l-4-5m4 5l-4 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         case 'report_cards':
             return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6zM9 13h6M9 9h6M9 17h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        case 'approve':
+            return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l4 4 12-12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         case 'logout':
             return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 17l5-5-5-5M21 12H9M9 19H4V5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         default:
@@ -91,12 +94,13 @@ function getSidebarIcon($key) {
         box-sizing: border-box;
     }
 
+    body {
+        overflow-x: hidden;
+    }
     :root {
         --sidebar-width: 280px;
         --sidebar-width-collapsed: 88px;
         --sidebar-width-tablet: 260px;
-        --sidebar-toggle-size: 32px;
-        --sidebar-toggle-offset: 12px;
     }
 
     /* Sidebar Styles */
@@ -109,7 +113,7 @@ function getSidebarIcon($key) {
         background: #023047;
         color: #fff; 
         overflow-y: auto; 
-        overflow-x: visible;
+        overflow-x: hidden;
         z-index: 200; 
         transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         display: flex;
@@ -137,7 +141,7 @@ function getSidebarIcon($key) {
 
     /* Sidebar Header */
     .sidebar-header {
-        padding: 20px;
+        padding: 16px 16px 20px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         display: flex;
         flex-direction: column;
@@ -167,45 +171,6 @@ function getSidebarIcon($key) {
         width: 36px;
         height: 36px;
         object-fit: contain;
-    }
-
-    .collapse-toggle {
-        position: fixed;
-        left: calc(var(--sidebar-width) - var(--sidebar-toggle-size) - var(--sidebar-toggle-offset));
-        top: 50%;
-        transform: translateY(-50%);
-        width: var(--sidebar-toggle-size);
-        height: var(--sidebar-toggle-size);
-        border: none;
-        border-radius: 50%;
-        background: #ffffff;
-        border: 2px solid #023047;
-        color: #023047;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        z-index: 400;
-        padding: 0;
-    }
-
-    .collapse-toggle:hover {
-        background: #f0f0f0;
-        transform: translateY(-50%) scale(1.1);
-    }
-
-    .collapse-toggle:focus {
-        outline: 2px solid #023047;
-        outline-offset: 2px;
-    }
-
-    .collapse-toggle svg {
-        width: 16px;
-        height: 16px;
-        transition: transform 0.3s ease;
-        flex-shrink: 0;
     }
 
     .role-badge {
@@ -390,16 +355,17 @@ function getSidebarIcon($key) {
     .sidebar-toggle {
         display: none;
         position: fixed;
-        top: 16px;
-        left: 16px;
+        top: 50%;
+        left: 0;
+        transform: translateY(-50%);
         z-index: 300;
-        width: 44px;
-        height: 44px;
+        width: 24px;
+        height: 24px;
         background: #023047;
         border: none;
-        border-radius: 10px;
+        border-radius: 12px;
         color: #fff;
-        font-size: 20px;
+        font-size: 14px;
         cursor: pointer;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         transition: all 0.2s ease;
@@ -407,11 +373,21 @@ function getSidebarIcon($key) {
 
     .sidebar-toggle:hover {
         background: #034563;
-        transform: scale(1.05);
+        transform: translateY(-50%) scale(1.05);
     }
 
     .sidebar-toggle:active {
-        transform: scale(0.95);
+        transform: translateY(-50%) scale(0.95);
+    }
+
+    .sidebar-toggle::before {
+        content: ">";
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    body.sidebar-open .sidebar-toggle::before {
+        content: "<";
     }
 
     /* Backdrop */
@@ -426,83 +402,6 @@ function getSidebarIcon($key) {
 
     body.sidebar-open .sidebar-backdrop { 
         display: block;
-    }
-
-    /* Collapsed sidebar (desktop) */
-    body.sidebar-collapsed .sidebar {
-        width: var(--sidebar-width-collapsed);
-    }
-
-    body.sidebar-collapsed .sidebar-header {
-        align-items: center;
-    }
-
-    body.sidebar-collapsed .collapse-toggle svg {
-        transform: rotate(180deg);
-    }
-
-    body.sidebar-collapsed .collapse-toggle {
-        left: calc(var(--sidebar-width-collapsed) - var(--sidebar-toggle-size) - var(--sidebar-toggle-offset));
-    }
-
-    body.sidebar-collapsed .sidebar-logo span,
-    body.sidebar-collapsed .role-badge,
-    body.sidebar-collapsed .user-box,
-    body.sidebar-collapsed .nav-section-title,
-    body.sidebar-collapsed .sidebar-nav a .label,
-    body.sidebar-collapsed .nav-logout a .label {
-        display: none;
-    }
-
-    body.sidebar-collapsed .sidebar-nav a,
-    body.sidebar-collapsed .nav-logout a {
-        justify-content: center;
-        padding: 12px 10px;
-    }
-
-    body.sidebar-collapsed .sidebar-nav a.active::before {
-        height: 60%;
-    }
-
-    body.sidebar-collapsed .main-content,
-    body.sidebar-collapsed .main-container {
-        margin-left: var(--sidebar-width-collapsed) !important;
-        max-width: calc(100% - var(--sidebar-width-collapsed)) !important;
-    }
-
-    body.sidebar-collapsed .student-header,
-    body.sidebar-collapsed .teacher-header,
-    body.sidebar-collapsed .admin-header,
-    body.sidebar-collapsed .facilitator-header {
-        left: var(--sidebar-width-collapsed) !important;
-        width: calc(100% - var(--sidebar-width-collapsed)) !important;
-    }
-
-    @media (max-width: 768px) {
-        body.sidebar-collapsed .sidebar {
-            width: 100%;
-            max-width: 300px;
-        }
-        body.sidebar-collapsed .sidebar-logo span,
-        body.sidebar-collapsed .role-badge,
-        body.sidebar-collapsed .user-box,
-        body.sidebar-collapsed .nav-section-title,
-        body.sidebar-collapsed .sidebar-nav a .label,
-        body.sidebar-collapsed .nav-logout a .label {
-            display: inline;
-        }
-        body.sidebar-collapsed .main-content,
-        body.sidebar-collapsed .main-container {
-            margin-left: 0 !important;
-            max-width: 100% !important;
-        }
-        body.sidebar-collapsed .student-header,
-        body.sidebar-collapsed .teacher-header,
-        body.sidebar-collapsed .admin-header,
-        body.sidebar-collapsed .facilitator-header {
-            left: 0 !important;
-            width: 100% !important;
-        }
     }
 
     /* Role-specific colors */
@@ -622,9 +521,7 @@ function getSidebarIcon($key) {
 </style>
 
 <!-- Mobile Toggle Button -->
-<button class="sidebar-toggle" onclick="document.body.classList.toggle('sidebar-open')" aria-label="Toggle Sidebar">
-    ☰
-</button>
+<button class="sidebar-toggle" onclick="document.body.classList.toggle('sidebar-open')" aria-label="Toggle Sidebar"></button>
 
 <!-- Sidebar Backdrop -->
 <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="document.body.classList.remove('sidebar-open')"></div>
@@ -641,12 +538,6 @@ function getSidebarIcon($key) {
         <span class="role-badge"><?= htmlspecialchars($role === 'student' || $role === 'detainee' ? 'Student' : $role) ?></span>
     </div>
 
-    <div class="collapse-toggle" onclick="toggleSidebar()" role="button" tabindex="0" aria-label="Toggle sidebar" onkeypress="if(event.key==='Enter') toggleSidebar()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-            <path d="M15 18l-6-6 6-6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-    </div>
-    
     <div class="user-box">
         <div class="user-box-label">Logged in as</div>
         <div class="user-box-name"><?= htmlspecialchars($_SESSION['loggedUser']['name'] ?? ucfirst($role)) ?></div>

@@ -127,6 +127,9 @@ $sql = "CREATE TABLE IF NOT EXISTS modules (
     file_path VARCHAR(255),
     teacher_id INT,
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    approval_status VARCHAR(20) NOT NULL DEFAULT 'approved',
+    approved_by INT NULL,
+    approved_at TIMESTAMP NULL DEFAULT NULL,
     FOREIGN KEY (subject_id) REFERENCES subjects(id),
     FOREIGN KEY (grade_level_id) REFERENCES grade_levels(id),
     FOREIGN KEY (teacher_id) REFERENCES teachers(id)

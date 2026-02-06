@@ -174,7 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
             
             if ($found_user) {
-                $success = "✅ Login successful! Redirecting...";
+                $success = "Login successful! Redirecting...";
                 header("refresh:1.5;url=$redirect_url");
             } else {
                 $error = "❌ Invalid username or password.";
@@ -671,7 +671,6 @@ $conn->close();
         
         <?php if ($success): ?>
             <div class="alert alert-success">
-                <span>✅</span>
                 <span><?= $success ?></span>
             </div>
         <?php endif; ?>
