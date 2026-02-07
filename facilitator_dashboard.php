@@ -39,6 +39,20 @@ function ensureModuleApprovalSchema($conn) {
 
 ensureModuleApprovalSchema($conn);
 
+function ensureActivityApprovalSchema($conn) {
+    if (!columnExists($conn, 'activity_sheets', 'approval_status')) {
+        $conn->query("ALTER TABLE activity_sheets ADD COLUMN approval_status VARCHAR(20) NOT NULL DEFAULT 'approved'");
+    }
+    if (!columnExists($conn, 'activity_sheets', 'approved_by')) {
+        $conn->query("ALTER TABLE activity_sheets ADD COLUMN approved_by INT NULL");
+    }
+    if (!columnExists($conn, 'activity_sheets', 'approved_at')) {
+        $conn->query("ALTER TABLE activity_sheets ADD COLUMN approved_at TIMESTAMP NULL DEFAULT NULL");
+    }
+}
+
+ensureActivityApprovalSchema($conn);
+
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $action = $_POST['action'] ?? '';
@@ -140,6 +154,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
     }
+
+    // Approve Activity
+    if ($action == 'approve_activity') {
+        $activity_id = intval($_POST['activity_id'] ?? 0);
+        if ($activity_id > 0) {
+            $stmt = $conn->prepare("UPDATE activity_sheets SET approval_status = 'approved', approved_by = ?, approved_at = NOW() WHERE id = ?");
+            if ($stmt) {
+                $stmt->bind_param("ii", $facilitator_id, $activity_id);
+                if ($stmt->execute()) {
+                    $message = 'Activity approved successfully';
+                } else {
+                    $message = 'Error approving activity';
+                }
+                $stmt->close();
+            }
+        }
+    }
 }
 
 // Get data
@@ -155,8 +186,15 @@ $pending_modules = $conn->query("SELECT m.*, s.title as subject_title, gl.level,
     WHERE m.approval_status = 'pending'
     ORDER BY m.uploaded_at DESC")->fetch_all(MYSQLI_ASSOC);
 
+$pending_activities = $conn->query("SELECT a.*, m.title as module_title, t.name as teacher_name FROM activity_sheets a 
+    LEFT JOIN modules m ON a.module_id = m.id 
+    LEFT JOIN teachers t ON a.teacher_id = t.id
+    WHERE a.approval_status = 'pending'
+    ORDER BY a.created_at DESC")->fetch_all(MYSQLI_ASSOC);
+
 $activity_sheets = $conn->query("SELECT a.*, m.title as module_title FROM activity_sheets a 
     LEFT JOIN modules m ON a.module_id = m.id 
+    WHERE a.approval_status = 'approved'
     ORDER BY a.created_at DESC")->fetch_all(MYSQLI_ASSOC);
 
 $detainees = $conn->query("SELECT * FROM detainees WHERE archived = 0 ORDER BY name")->fetch_all(MYSQLI_ASSOC);
@@ -419,6 +457,47 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
                                 <form method="POST" style="display:inline;">
                                     <input type="hidden" name="action" value="approve_module">
                                     <input type="hidden" name="module_id" value="<?= $mod['id'] ?>">
+                                    <button type="submit">Approve</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- APPROVE ACTIVITIES SECTION -->
+    <div class="section <?= $section == 'approve_activities' ? 'active' : '' ?>">
+        <h2>✅ Approve Activities</h2>
+
+        <div class="card">
+            <?php if (empty($pending_activities)): ?>
+                <p>No activities awaiting approval.</p>
+            <?php else: ?>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Activity</th>
+                            <th>Module</th>
+                            <th>Teacher</th>
+                            <th>Created</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($pending_activities as $act): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($act['title']) ?></td>
+                            <td><?= htmlspecialchars($act['module_title'] ?? 'N/A') ?></td>
+                            <td><?= htmlspecialchars($act['teacher_name'] ?? 'N/A') ?></td>
+                            <td><?= date('M d, Y', strtotime($act['created_at'])) ?></td>
+                            <td>
+                                <a href="<?= htmlspecialchars($act['file_path']) ?>" target="_blank" style="margin-right:8px;">Preview</a>
+                                <form method="POST" style="display:inline;">
+                                    <input type="hidden" name="action" value="approve_activity">
+                                    <input type="hidden" name="activity_id" value="<?= $act['id'] ?>">
                                     <button type="submit">Approve</button>
                                 </form>
                             </td>

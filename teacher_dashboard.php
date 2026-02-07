@@ -60,6 +60,20 @@ function ensureModuleApprovalSchema($conn) {
 }
 
 ensureModuleApprovalSchema($conn);
+
+function ensureActivityApprovalSchema($conn) {
+    if (!columnExists($conn, 'activity_sheets', 'approval_status')) {
+        $conn->query("ALTER TABLE activity_sheets ADD COLUMN approval_status VARCHAR(20) NOT NULL DEFAULT 'approved'");
+    }
+    if (!columnExists($conn, 'activity_sheets', 'approved_by')) {
+        $conn->query("ALTER TABLE activity_sheets ADD COLUMN approved_by INT NULL");
+    }
+    if (!columnExists($conn, 'activity_sheets', 'approved_at')) {
+        $conn->query("ALTER TABLE activity_sheets ADD COLUMN approved_at TIMESTAMP NULL DEFAULT NULL");
+    }
+}
+
+ensureActivityApprovalSchema($conn);
 if (tableExists($conn, 'activity_submissions')) {
     $conn->query("UPDATE activity_submissions SET status = 'submitted' WHERE status = 'forwarded'");
 }
@@ -168,11 +182,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                 $title = $_POST['activity_title'];
                 $module_id = $_POST['module_id'];
                 
-                $stmt = $conn->prepare("INSERT INTO activity_sheets (title, module_id, file_path, teacher_id) VALUES (?, ?, ?, ?)");
+                $stmt = $conn->prepare("INSERT INTO activity_sheets (title, module_id, file_path, teacher_id, approval_status) VALUES (?, ?, ?, ?, 'pending')");
                 $stmt->bind_param("sisi", $title, $module_id, $filepath, $teacher_id);
                 
                 if ($stmt->execute()) {
-                    $message = '✅ Activity sheet uploaded successfully';
+                    $message = '✅ Activity sheet uploaded successfully and is pending facilitator approval';
                 } else {
                     $message = '❌ Error saving activity sheet';
                 }
@@ -345,10 +359,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                     }
                 }
 
-                $updateStmt = $conn->prepare("UPDATE activity_sheets SET title = ?, module_id = ?, file_path = ? WHERE id = ? AND teacher_id = ?");
+                $updateStmt = $conn->prepare("UPDATE activity_sheets SET title = ?, module_id = ?, file_path = ?, approval_status = 'pending', approved_by = NULL, approved_at = NULL WHERE id = ? AND teacher_id = ?");
                 $updateStmt->bind_param('sisii', $title, $module_id, $newPath, $activity_id, $teacher_id);
                 if ($updateStmt->execute()) {
-                    $message = '✅ Activity sheet updated successfully';
+                    $message = '✅ Activity sheet updated and is pending facilitator approval';
                 } else {
                     $message = '❌ Failed to update activity sheet';
                 }
@@ -548,6 +562,11 @@ $recentSubmissions = array_slice($submissions, 0, 5);
             background: #e2e8f0;
             color: #1f2937;
         }
+        .status-chip--approved {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
         .section .card {
             margin-top: 0;
             margin-bottom: 20px;
@@ -717,7 +736,7 @@ $recentSubmissions = array_slice($submissions, 0, 5);
                                 <div class="list-meta">
                                     <?= date('M d, Y', strtotime($mod['uploaded_at'])) ?>
                                     <?php if (!empty($mod['approval_status'])): ?>
-                                        • <span class="status-chip"><?= htmlspecialchars(ucfirst($mod['approval_status'])) ?></span>
+                                        • <span class="status-chip <?= strtolower($mod['approval_status']) === 'approved' ? 'status-chip--approved' : '' ?>"><?= htmlspecialchars(ucfirst($mod['approval_status'])) ?></span>
                                     <?php endif; ?>
                                 </div>
                             </li>
@@ -819,7 +838,7 @@ $recentSubmissions = array_slice($submissions, 0, 5);
                     <td><?= htmlspecialchars($mod['title']) ?></td>
                     <td><?= htmlspecialchars($mod['subject_title'] ?? 'N/A') ?></td>
                     <td><?= htmlspecialchars($mod['level'] ?? 'N/A') ?></td>
-                    <td><?= htmlspecialchars(ucfirst($mod['approval_status'] ?? 'approved')) ?></td>
+                    <td><span class="status-chip <?= strtolower($mod['approval_status'] ?? 'approved') === 'approved' ? 'status-chip--approved' : '' ?>"><?= htmlspecialchars(ucfirst($mod['approval_status'] ?? 'approved')) ?></span></td>
                     <td><?= date('M d, Y', strtotime($mod['uploaded_at'])) ?></td>
                     <td style="white-space:nowrap">
                         <button type="button" class="btn btn-edit" onclick='openEditModule(<?= json_encode($mod, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT) ?>)' aria-label="Edit module <?= htmlspecialchars($mod['title']) ?>" title="Edit">✏️ Edit</button>
@@ -963,6 +982,7 @@ $recentSubmissions = array_slice($submissions, 0, 5);
                     <th>Title</th>
                     <th>Module</th>
                     <th>Created</th>
+                    <th>Status</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -972,6 +992,7 @@ $recentSubmissions = array_slice($submissions, 0, 5);
                     <td><?= htmlspecialchars($act['title']) ?></td>
                     <td><?= htmlspecialchars($act['module_title'] ?? 'N/A') ?></td>
                     <td><?= date('M d, Y', strtotime($act['created_at'])) ?></td>
+                    <td><span class="status-chip <?= strtolower($act['approval_status'] ?? 'approved') === 'approved' ? 'status-chip--approved' : '' ?>"><?= htmlspecialchars(ucfirst($act['approval_status'] ?? 'approved')) ?></span></td>
                         <td style="white-space:nowrap">
                             <button type="button" class="btn btn-edit" onclick='openEditActivity(<?= json_encode($act, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT) ?>)' aria-label="Edit activity <?= htmlspecialchars($act['title']) ?>">✏️ Edit</button>
                             <form method="POST" style="display:inline;margin-left:8px;" onsubmit="return confirm('Delete this activity sheet? This removes the file.')">
@@ -1296,3 +1317,5 @@ $recentSubmissions = array_slice($submissions, 0, 5);
 
 </body>
 </html>
+
+

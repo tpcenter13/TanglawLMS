@@ -48,8 +48,17 @@ if ($grade) {
 $hasSubmissionsTable = tableExists($conn, 'activity_submissions');
 $hasActivitiesTable = tableExists($conn, 'activity_sheets');
 $hasModuleApproval = columnExists($conn, 'modules', 'approval_status');
+$hasActivityApproval = columnExists($conn, 'activity_sheets', 'approval_status');
 $orderBy = $PORTAL_MODULE_ORDER_BY ?? 'm.uploaded_at ASC';
 $approvalClause = $hasModuleApproval ? " AND m.approval_status = 'approved'" : "";
+$activityIndexSubquery = "SELECT module_id, COUNT(*) as activity_count, MAX(id) as latest_activity_id FROM activity_sheets";
+if ($hasActivityApproval) {
+    $activityIndexSubquery .= " WHERE approval_status = 'approved'";
+}
+$activityIndexSubquery .= " GROUP BY module_id";
+$activityJoinClause = $hasActivityApproval
+    ? "LEFT JOIN activity_sheets act ON act.id = act_idx.latest_activity_id AND act.approval_status = 'approved'"
+    : "LEFT JOIN activity_sheets act ON act.id = act_idx.latest_activity_id";
 
 // Build module list with latest activity and latest submission
 $modulesAll = [];
@@ -79,11 +88,9 @@ if ($gradeId !== null && $studentSchool !== null) {
                 ) s2 ON s2.module_id = s1.module_id AND s2.student_id = s1.student_id AND s2.max_submitted_at = s1.submitted_at
             ) asub ON asub.module_id = m.id AND asub.student_id = ?
             LEFT JOIN (
-                SELECT module_id, COUNT(*) as activity_count, MAX(id) as latest_activity_id
-                FROM activity_sheets
-                GROUP BY module_id
+                $activityIndexSubquery
             ) act_idx ON act_idx.module_id = m.id
-            LEFT JOIN activity_sheets act ON act.id = act_idx.latest_activity_id
+            $activityJoinClause
             WHERE m.grade_level_id = ? AND m.school = ?$approvalClause
             ORDER BY $orderBy
         ";
@@ -149,11 +156,9 @@ if ($gradeId !== null && $studentSchool !== null) {
             LEFT JOIN subjects s ON m.subject_id = s.id
             LEFT JOIN module_progress mp ON m.id = mp.module_id AND mp.student_id = ?
             LEFT JOIN (
-                SELECT module_id, COUNT(*) as activity_count, MAX(id) as latest_activity_id
-                FROM activity_sheets
-                GROUP BY module_id
+                $activityIndexSubquery
             ) act_idx ON act_idx.module_id = m.id
-            LEFT JOIN activity_sheets act ON act.id = act_idx.latest_activity_id
+            $activityJoinClause
             WHERE m.grade_level_id = ? AND m.school = ?$approvalClause
             ORDER BY $orderBy
         ";

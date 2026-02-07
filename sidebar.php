@@ -33,6 +33,7 @@ $menuItems = [
     $menuItems = [
         'dashboard' => ['label' => 'Dashboard', 'url' => '?section=dashboard'],
         'approve' => ['label' => 'Approve Modules', 'url' => '?section=approve'],
+        'approve_activities' => ['label' => 'Approve Activities', 'url' => '?section=approve_activities'],
         'print' => ['label' => 'Print Activities', 'url' => '?section=print'],
         'distribute' => ['label' => 'Distribute', 'url' => '?section=distribute'],
         'collect' => ['label' => 'Collect', 'url' => '?section=collect'],
@@ -79,6 +80,7 @@ function getSidebarIcon($key) {
         case 'report_cards':
             return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6zM9 13h6M9 9h6M9 17h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         case 'approve':
+        case 'approve_activities':
             return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l4 4 12-12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
         case 'logout':
             return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 17l5-5-5-5M21 12H9M9 19H4V5h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
