@@ -2,6 +2,7 @@
 /**
  * ADMIN FUNCTIONS - User Management
  * Handles Teachers, Facilitators, and Detainees
+ * UPDATED WITH PASSWORD AND ENROLLMENT VALIDATION
  */
 
 // Load PHPMailer autoloader
@@ -166,6 +167,16 @@ function sendViaPHPMailer($toEmail, $subject, $bodyHtml) {
  * @return array - ['success' => bool, 'message' => string]
  */
 function addTeacher($conn, $id_number, $name, $email, $position, $provider_id = null, $level = null, $profile_file = null, $adminPassword = null) {
+    // ===== VALIDATION: Password length =====
+    if (!empty($adminPassword) && strlen($adminPassword) < 8) {
+        return ['success' => false, 'message' => '❌ Password must be at least 8 characters long'];
+    }
+    
+    // ===== VALIDATION: Required provider_id for teachers =====
+    if (empty($provider_id)) {
+        return ['success' => false, 'message' => '❌ School/Provider is required for teachers'];
+    }
+    
     // Check for duplicate ID Number
     $checkStmt = $conn->prepare("SELECT id FROM teachers WHERE id_number = ?");
     $checkStmt->bind_param("s", $id_number);
@@ -271,6 +282,16 @@ function addTeacher($conn, $id_number, $name, $email, $position, $provider_id = 
  * Edit Teacher
  */
 function editTeacher($conn, $teacher_id, $id_number, $name, $email, $position, $provider_id = null, $level = null, $profile_file = null, $newPassword = null) {
+    // ===== VALIDATION: Password length =====
+    if (!empty($newPassword) && strlen($newPassword) < 8) {
+        return ['success' => false, 'message' => '❌ Password must be at least 8 characters long'];
+    }
+    
+    // ===== VALIDATION: Required provider_id for teachers =====
+    if (empty($provider_id)) {
+        return ['success' => false, 'message' => '❌ School/Provider is required for teachers'];
+    }
+    
     // Check if new ID Number exists elsewhere
     $checkStmt = $conn->prepare("SELECT id FROM teachers WHERE id_number = ? AND id != ?");
     $checkStmt->bind_param("si", $id_number, $teacher_id);
@@ -398,6 +419,11 @@ function getAllTeachers($conn, $includeArchived = false) {
  * Add Facilitator
  */
 function addFacilitator($conn, $id_number, $name, $email, $position, $employment_status, $adminPassword = null) {
+    // ===== VALIDATION: Password length =====
+    if (!empty($adminPassword) && strlen($adminPassword) < 8) {
+        return ['success' => false, 'message' => '❌ Password must be at least 8 characters long'];
+    }
+    
     // Check for duplicate ID Number
     $checkStmt = $conn->prepare("SELECT id FROM facilitators WHERE id_number = ?");
     $checkStmt->bind_param("s", $id_number);
@@ -455,6 +481,11 @@ function addFacilitator($conn, $id_number, $name, $email, $position, $employment
  * Edit Facilitator
  */
 function editFacilitator($conn, $facilitator_id, $id_number, $name, $email, $position, $employment_status, $newPassword = null) {
+    // ===== VALIDATION: Password length =====
+    if (!empty($newPassword) && strlen($newPassword) < 8) {
+        return ['success' => false, 'message' => '❌ Password must be at least 8 characters long'];
+    }
+    
     // Check if new ID Number exists elsewhere
     $checkStmt = $conn->prepare("SELECT id FROM facilitators WHERE id_number = ? AND id != ?");
     $checkStmt->bind_param("si", $id_number, $facilitator_id);
@@ -533,6 +564,16 @@ function getAllFacilitators($conn, $includeArchived = false) {
  * Add Detainee
  */
 function addDetainee($conn, $id_number, $name, $email, $grade_level, $school = null, $adminPassword = null) {
+    // ===== VALIDATION: Password length =====
+    if (!empty($adminPassword) && strlen($adminPassword) < 8) {
+        return ['success' => false, 'message' => '❌ Password must be at least 8 characters long'];
+    }
+    
+    // ===== VALIDATION: Required school for detainees/students =====
+    if (empty($school)) {
+        return ['success' => false, 'message' => '❌ School is required for students'];
+    }
+    
     // Check for duplicate ID Number
     $checkStmt = $conn->prepare("SELECT id FROM detainees WHERE id_number = ?");
     $checkStmt->bind_param("s", $id_number);
@@ -599,6 +640,16 @@ function addDetainee($conn, $id_number, $name, $email, $grade_level, $school = n
  * Edit Detainee
  */
 function editDetainee($conn, $detainee_id, $id_number, $name, $email, $grade_level, $school = null, $newPassword = null) {
+    // ===== VALIDATION: Password length =====
+    if (!empty($newPassword) && strlen($newPassword) < 8) {
+        return ['success' => false, 'message' => '❌ Password must be at least 8 characters long'];
+    }
+    
+    // ===== VALIDATION: Required school for detainees/students =====
+    if (empty($school)) {
+        return ['success' => false, 'message' => '❌ School is required for students'];
+    }
+    
     // Check if new ID Number exists elsewhere
     $checkStmt = $conn->prepare("SELECT id FROM detainees WHERE id_number = ? AND id != ?");
     $checkStmt->bind_param("si", $id_number, $detainee_id);
@@ -802,6 +853,11 @@ function sendPasswordResetEmail($toEmail, $name, $token) {
 }
 
 function setUserPassword($conn, $role, $user_id, $plainPassword) {
+    // ===== VALIDATION: Password length =====
+    if (strlen($plainPassword) < 8) {
+        return false;
+    }
+    
     $hash = password_hash($plainPassword, PASSWORD_DEFAULT);
     if ($role === 'teacher') {
         $stmt = $conn->prepare("UPDATE teachers SET password = ? WHERE id = ?");

@@ -21,7 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // ====== TEACHER MANAGEMENT ======
     if ($action == 'edit_teacher') {
         if (empty($_POST['teacher_id']) || empty($_POST['id_number']) || empty($_POST['name'])) {
-            $message = 'Please fill in all fields.';
+            $message = '❌ Please fill in all required fields.';
+        } elseif (empty($_POST['provider_id'])) {
+            $message = '❌ School/Provider is required for teachers.';
+        } elseif (!empty($_POST['new_password']) && strlen($_POST['new_password']) < 8) {
+            $message = '❌ Password must be at least 8 characters long.';
         } else {
             $result = editTeacher(
                 $conn,
@@ -40,29 +44,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
     
-   if ($action == 'add_teacher') {
-    if (empty($_POST['id_number']) || empty($_POST['name'])) {
-        $message = 'Please fill in all fields.';
-    } else {
-        $result = addTeacher(
-            $conn,
-            $_POST['id_number'],
-            $_POST['name'],
-            $_POST['email'] ?? '',
-            $_POST['position'] ?? '',
-            !empty($_POST['provider_id']) ? (int)$_POST['provider_id'] : null,
-            $_POST['level'] ?? null,
-            null,
-            !empty($_POST['password']) ? $_POST['password'] : null
-        );
-        $message = $result['message'];
-        $section = 'teachers';
+    if ($action == 'add_teacher') {
+        if (empty($_POST['id_number']) || empty($_POST['name'])) {
+            $message = '❌ Please fill in all required fields.';
+        } elseif (empty($_POST['provider_id'])) {
+            $message = '❌ School/Provider is required for teachers.';
+        } elseif (!empty($_POST['password']) && strlen($_POST['password']) < 8) {
+            $message = '❌ Password must be at least 8 characters long.';
+        } else {
+            $result = addTeacher(
+                $conn,
+                $_POST['id_number'],
+                $_POST['name'],
+                $_POST['email'] ?? '',
+                $_POST['position'] ?? '',
+                !empty($_POST['provider_id']) ? (int)$_POST['provider_id'] : null,
+                $_POST['level'] ?? null,
+                null,
+                !empty($_POST['password']) ? $_POST['password'] : null
+            );
+            $message = $result['message'];
+            $section = 'teachers';
+        }
     }
-}
     
     if ($action == 'archive_teacher') {
         if (empty($_POST['teacher_id'])) {
-            $message = 'Please fill in all fields.';
+            $message = '❌ Please fill in all fields.';
         } else {
             $result = archiveTeacher($conn, $_POST['teacher_id']);
             $message = $result['message'];
@@ -72,7 +80,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // ====== FACILITATOR MANAGEMENT ======
     if ($action == 'add_facilitator') {
         if (empty($_POST['id_number']) || empty($_POST['name'])) {
-            $message = 'Please fill in all fields.';
+            $message = '❌ Please fill in all required fields.';
+        } elseif (!empty($_POST['password']) && strlen($_POST['password']) < 8) {
+            $message = '❌ Password must be at least 8 characters long.';
         } else {
             $result = addFacilitator($conn, $_POST['id_number'], $_POST['name'], $_POST['email'] ?? '', $_POST['position'] ?? '', $_POST['employment_status'] ?? '', !empty($_POST['password']) ? $_POST['password'] : null);
             $message = $result['message'];
@@ -81,7 +91,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     if ($action == 'edit_facilitator') {
         if (empty($_POST['facilitator_id']) || empty($_POST['id_number']) || empty($_POST['name'])) {
-            $message = 'Please fill in all fields.';
+            $message = '❌ Please fill in all required fields.';
+        } elseif (!empty($_POST['new_password']) && strlen($_POST['new_password']) < 8) {
+            $message = '❌ Password must be at least 8 characters long.';
         } else {
             $result = editFacilitator($conn, $_POST['facilitator_id'], $_POST['id_number'], $_POST['name'], $_POST['email'] ?? '', $_POST['position'] ?? '', $_POST['employment_status'] ?? '', !empty($_POST['new_password']) ? $_POST['new_password'] : null);
             $message = $result['message'];
@@ -90,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     if ($action == 'archive_facilitator') {
         if (empty($_POST['facilitator_id'])) {
-            $message = 'Please fill in all fields.';
+            $message = '❌ Please fill in all fields.';
         } else {
             $result = archiveFacilitator($conn, $_POST['facilitator_id']);
             $message = $result['message'];
@@ -100,7 +112,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     // ====== DETAINEE MANAGEMENT ======
     if ($action == 'add_detainee') {
         if (empty($_POST['id_number']) || empty($_POST['name']) || empty($_POST['grade_level'])) {
-            $message = 'Please fill in all fields.';
+            $message = '❌ Please fill in all required fields.';
+        } elseif (empty($_POST['school'])) {
+            $message = '❌ School is required for students.';
+        } elseif (!empty($_POST['password']) && strlen($_POST['password']) < 8) {
+            $message = '❌ Password must be at least 8 characters long.';
         } else {
             $result = addDetainee($conn, $_POST['id_number'], $_POST['name'], $_POST['email'] ?? '', $_POST['grade_level'], $_POST['school'] ?? null, !empty($_POST['password']) ? $_POST['password'] : null);
             $message = $result['message'];
@@ -109,7 +125,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     if ($action == 'edit_detainee') {
         if (empty($_POST['detainee_id']) || empty($_POST['id_number']) || empty($_POST['name']) || empty($_POST['grade_level'])) {
-            $message = 'Please fill in all fields.';
+            $message = '❌ Please fill in all required fields.';
+        } elseif (empty($_POST['school'])) {
+            $message = '❌ School is required for students.';
+        } elseif (!empty($_POST['new_password']) && strlen($_POST['new_password']) < 8) {
+            $message = '❌ Password must be at least 8 characters long.';
         } else {
             $result = editDetainee($conn, $_POST['detainee_id'], $_POST['id_number'], $_POST['name'], $_POST['email'] ?? '', $_POST['grade_level'], $_POST['school'] ?? null, !empty($_POST['new_password']) ? $_POST['new_password'] : null);
             $message = $result['message'];
@@ -118,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     if ($action == 'archive_detainee') {
         if (empty($_POST['detainee_id'])) {
-            $message = 'Please fill in all fields.';
+            $message = '❌ Please fill in all fields.';
         } else {
             $result = archiveDetainee($conn, $_POST['detainee_id']);
             $message = $result['message'];
@@ -358,10 +378,20 @@ $providers = getAllProviders($conn);
         .form-row.full { grid-template-columns: 1fr; }
         .form-group { display: flex; flex-direction: column; }
         .form-group label { font-weight: 600; margin-bottom: 5px; }
+        .form-group label .required { color: #dc2626; font-weight: 700; }
         .form-group input, .form-group select {
             padding: 10px 12px;
             border: 1px solid #d1d5db;
             border-radius: 10px;
+        }
+        .form-group input:invalid:not(:placeholder-shown), 
+        .form-group select:invalid:not(:placeholder-shown) {
+            border-color: #dc2626;
+        }
+        .password-hint {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 4px;
         }
         button[type="submit"] {
             background:#4f772d;
@@ -444,6 +474,54 @@ $providers = getAllProviders($conn);
         }
     </style>
     <script>
+        // Client-side password validation
+        function validatePassword(input) {
+            if (input.value.length > 0 && input.value.length < 8) {
+                input.setCustomValidity('Password must be at least 8 characters long');
+            } else {
+                input.setCustomValidity('');
+            }
+        }
+
+        // Validate form before submission
+        function validateForm(form) {
+            const passwordInputs = form.querySelectorAll('input[type="password"]');
+            let isValid = true;
+
+            passwordInputs.forEach(input => {
+                if (input.value.length > 0 && input.value.length < 8) {
+                    alert('Password must be at least 8 characters long');
+                    isValid = false;
+                    input.focus();
+                    return false;
+                }
+            });
+
+            // Check required fields for teachers
+            if (form.querySelector('input[name="action"][value="add_teacher"]') || 
+                form.querySelector('input[name="action"][value="edit_teacher"]')) {
+                const providerSelect = form.querySelector('select[name="provider_id"]');
+                if (providerSelect && !providerSelect.value) {
+                    alert('School/Provider is required for teachers');
+                    providerSelect.focus();
+                    return false;
+                }
+            }
+
+            // Check required fields for students
+            if (form.querySelector('input[name="action"][value="add_detainee"]') || 
+                form.querySelector('input[name="action"][value="edit_detainee"]')) {
+                const schoolSelect = form.querySelector('select[name="school"]');
+                if (schoolSelect && !schoolSelect.value) {
+                    alert('School is required for students');
+                    schoolSelect.focus();
+                    return false;
+                }
+            }
+
+            return isValid;
+        }
+
         function openModal(modalId) {
             document.getElementById(modalId).classList.add('show');
         }
@@ -602,6 +680,14 @@ $providers = getAllProviders($conn);
                 addSchool.addEventListener('change', function(){ setDetaineeGradeOptions(this.value, addGrade); });
                 setDetaineeGradeOptions(addSchool.value, addGrade);
             }
+
+            // Add password validation listeners
+            const passwordInputs = document.querySelectorAll('input[type="password"]');
+            passwordInputs.forEach(input => {
+                input.addEventListener('input', function() {
+                    validatePassword(this);
+                });
+            });
         });
        
     </script>
@@ -696,15 +782,15 @@ $providers = getAllProviders($conn);
         
         <div class="card">
             <h3>Add New Teacher</h3>
-            <form method="POST">
+            <form method="POST" onsubmit="return validateForm(this)">
                 <input type="hidden" name="action" value="add_teacher">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number</label>
+                        <label>ID Number <span class="required">*</span></label>
                         <input type="text" name="id_number" required>
                     </div>
                     <div class="form-group">
-                        <label>Name</label>
+                        <label>Name <span class="required">*</span></label>
                         <input type="text" name="name" required>
                     </div>
                 </div>
@@ -720,9 +806,9 @@ $providers = getAllProviders($conn);
                         <input type="text" name="position" placeholder="e.g., Science Teacher">
                     </div>
                     <div class="form-group">
-                        <label>School / Provider</label>
-                        <select name="provider_id">
-                            <option value="">(None)</option>
+                        <label>School / Provider <span class="required">*</span></label>
+                        <select name="provider_id" required>
+                            <option value="">Select School/Provider</option>
                             <?php foreach($providers as $prov): ?>
                             <option value="<?= $prov['id'] ?>"><?= htmlspecialchars($prov['name']) ?></option>
                             <?php endforeach; ?>
@@ -733,7 +819,7 @@ $providers = getAllProviders($conn);
                     <div class="form-group">
                         <label>Teaching Level</label>
                         <select name="level">
-                            <option value="">(Select level)</option>
+                            <option value="">Select level</option>
                             <option value="Elementary">Elementary</option>
                             <option value="High School">High School</option>
                             <option value="Senior High School">Senior High School</option>
@@ -743,8 +829,9 @@ $providers = getAllProviders($conn);
                 </div>
                 <div class="form-row full">
                     <div class="form-group">
-                        <label>Password </label>
-                        <input type="password" name="password" placeholder="Enter password ">
+                        <label>Password (optional)</label>
+                        <input type="password" name="password" placeholder="Leave blank to auto-generate" minlength="8" oninput="validatePassword(this)">
+                        <small class="password-hint">If blank, a random password will be generated. Minimum 8 characters required.</small>
                     </div>
                 </div>
                 <button type="submit">Add Teacher</button>
@@ -795,16 +882,16 @@ $providers = getAllProviders($conn);
         <div class="modal-content">
             <span class="modal-close" onclick="closeModal('edit_teacher_modal')">&times;</span>
             <h2>Edit Teacher</h2>
-            <form method="POST" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data" onsubmit="return validateForm(this)">
                 <input type="hidden" name="action" value="edit_teacher">
                 <input type="hidden" name="teacher_id" id="edit_teacher_id">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number</label>
+                        <label>ID Number <span class="required">*</span></label>
                         <input type="text" name="id_number" id="edit_teacher_id_number" required>
                     </div>
                     <div class="form-group">
-                        <label>Name</label>
+                        <label>Name <span class="required">*</span></label>
                         <input type="text" name="name" id="edit_teacher_name" required>
                     </div>
                 </div>
@@ -820,9 +907,9 @@ $providers = getAllProviders($conn);
                         <input type="text" name="position" id="edit_teacher_position" placeholder="e.g., Science Teacher">
                     </div>
                     <div class="form-group">
-                        <label>School / Provider</label>
-                        <select name="provider_id" id="edit_teacher_provider_id">
-                            <option value="">(None)</option>
+                        <label>School / Provider <span class="required">*</span></label>
+                        <select name="provider_id" id="edit_teacher_provider_id" required>
+                            <option value="">Select School/Provider</option>
                             <?php foreach($providers as $prov): ?>
                             <option value="<?= $prov['id'] ?>"><?= htmlspecialchars($prov['name']) ?></option>
                             <?php endforeach; ?>
@@ -833,7 +920,7 @@ $providers = getAllProviders($conn);
                     <div class="form-group">
                         <label>Teaching Level</label>
                         <select name="level" id="edit_teacher_level">
-                            <option value="">(Select level)</option>
+                            <option value="">Select level</option>
                             <option value="Elementary">Elementary</option>
                             <option value="High School">High School</option>
                             <option value="Senior High School">Senior High School</option>
@@ -844,7 +931,8 @@ $providers = getAllProviders($conn);
                 <div class="form-row">
                     <div class="form-group">
                         <label>Set new password</label>
-                        <input type="password" name="new_password" id="edit_teacher_new_password" placeholder="Leave blank to keep current password">
+                        <input type="password" name="new_password" id="edit_teacher_new_password" placeholder="Leave blank to keep current password" minlength="8" oninput="validatePassword(this)">
+                        <small class="password-hint">Minimum 8 characters required.</small>
                     </div>
                 </div>
                 <button type="submit">Update Teacher</button>
@@ -859,15 +947,15 @@ $providers = getAllProviders($conn);
         
         <div class="card">
             <h3>Add New Facilitator</h3>
-            <form method="POST">
+            <form method="POST" onsubmit="return validateForm(this)">
                 <input type="hidden" name="action" value="add_facilitator">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number</label>
+                        <label>ID Number <span class="required">*</span></label>
                         <input type="text" name="id_number" required>
                     </div>
                     <div class="form-group">
-                        <label>Name</label>
+                        <label>Name <span class="required">*</span></label>
                         <input type="text" name="name" required>
                     </div>
                 </div>
@@ -893,8 +981,9 @@ $providers = getAllProviders($conn);
                 </div>
                 <div class="form-row full">
                     <div class="form-group">
-                        <label>Password </label>
-                        <input type="password" name="password" placeholder="Enter password ">
+                        <label>Password (optional)</label>
+                        <input type="password" name="password" placeholder="Leave blank to auto-generate" minlength="8" oninput="validatePassword(this)">
+                        <small class="password-hint">If blank, a random password will be generated. Minimum 8 characters required.</small>
                     </div>
                 </div>
                 <button type="submit">Add Facilitator</button>
@@ -944,16 +1033,16 @@ $providers = getAllProviders($conn);
         <div class="modal-content">
             <span class="modal-close" onclick="closeModal('edit_facilitator_modal')">&times;</span>
             <h2>Edit Facilitator</h2>
-            <form method="POST">
+            <form method="POST" onsubmit="return validateForm(this)">
                 <input type="hidden" name="action" value="edit_facilitator">
                 <input type="hidden" name="facilitator_id" id="edit_facilitator_id">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number</label>
+                        <label>ID Number <span class="required">*</span></label>
                         <input type="text" name="id_number" id="edit_facilitator_id_number" required>
                     </div>
                     <div class="form-group">
-                        <label>Name</label>
+                        <label>Name <span class="required">*</span></label>
                         <input type="text" name="name" id="edit_facilitator_name" required>
                     </div>
                 </div>
@@ -980,7 +1069,8 @@ $providers = getAllProviders($conn);
                 <div class="form-row full">
                     <div class="form-group">
                         <label>Set new password</label>
-                        <input type="password" name="new_password" id="edit_facilitator_new_password" placeholder="Leave blank to keep current password">
+                        <input type="password" name="new_password" id="edit_facilitator_new_password" placeholder="Leave blank to keep current password" minlength="8" oninput="validatePassword(this)">
+                        <small class="password-hint">Minimum 8 characters required.</small>
                     </div>
                 </div>
                 <button type="submit">Update Facilitator</button>
@@ -994,15 +1084,15 @@ $providers = getAllProviders($conn);
         
         <div class="card">
             <h3>Add New Student</h3>
-            <form method="POST">
+            <form method="POST" onsubmit="return validateForm(this)">
                 <input type="hidden" name="action" value="add_detainee">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number</label>
+                        <label>ID Number <span class="required">*</span></label>
                         <input type="text" name="id_number" required>
                     </div>
                     <div class="form-group">
-                        <label>Name</label>
+                        <label>Name <span class="required">*</span></label>
                         <input type="text" name="name" required>
                     </div>
                 </div>
@@ -1014,8 +1104,8 @@ $providers = getAllProviders($conn);
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>School</label>
-                        <select name="school" id="add_detainee_school">
+                        <label>School <span class="required">*</span></label>
+                        <select name="school" id="add_detainee_school" required>
                             <option value="">Select School</option>
                             <option value="Marcelo Facility">Marcelo Facility</option>
                             <option value="St. Martin Center">St. Martin Center</option>
@@ -1026,7 +1116,7 @@ $providers = getAllProviders($conn);
                 </div>
                 <div class="form-row full">
                     <div class="form-group">
-                        <label>Grade Level</label>
+                        <label>Grade Level <span class="required">*</span></label>
                         <select name="grade_level" id="add_detainee_grade_level" required>
                             <option value="">Select Grade Level</option>
                             <?php foreach($grade_levels as $gl): ?>
@@ -1037,8 +1127,9 @@ $providers = getAllProviders($conn);
                 </div>
                 <div class="form-row full">
                     <div class="form-group">
-                        <label>Password </label>
-                        <input type="password" name="password" placeholder="Enter password ">
+                        <label>Password (optional)</label>
+                        <input type="password" name="password" placeholder="Leave blank to auto-generate" minlength="8" oninput="validatePassword(this)">
+                        <small class="password-hint">If blank, a random password will be generated. Minimum 8 characters required.</small>
                     </div>
                 </div>
                 <button type="submit">Add Student</button>
@@ -1099,16 +1190,16 @@ $providers = getAllProviders($conn);
         <div class="modal-content">
             <span class="modal-close" onclick="closeModal('edit_detainee_modal')">&times;</span>
             <h2>Edit Student</h2>
-            <form method="POST">
+            <form method="POST" onsubmit="return validateForm(this)">
                 <input type="hidden" name="action" value="edit_detainee">
                 <input type="hidden" name="detainee_id" id="edit_detainee_id">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number</label>
+                        <label>ID Number <span class="required">*</span></label>
                         <input type="text" name="id_number" id="edit_detainee_id_number" required>
                     </div>
                     <div class="form-group">
-                        <label>Name</label>
+                        <label>Name <span class="required">*</span></label>
                         <input type="text" name="name" id="edit_detainee_name" required>
                     </div>
                 </div>
@@ -1120,8 +1211,8 @@ $providers = getAllProviders($conn);
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>School</label>
-                        <select name="school" id="edit_detainee_school" onchange="setDetaineeGradeOptions(this.value, document.getElementById('edit_detainee_grade_level'))">
+                        <label>School <span class="required">*</span></label>
+                        <select name="school" id="edit_detainee_school" onchange="setDetaineeGradeOptions(this.value, document.getElementById('edit_detainee_grade_level'))" required>
                             <option value="">Select School</option>
                             <option value="Marcelo Facility">Marcelo Facility</option>
                             <option value="St. Martin Center">St. Martin Center</option>
@@ -1132,7 +1223,7 @@ $providers = getAllProviders($conn);
                 </div>
                 <div class="form-row full">
                     <div class="form-group">
-                        <label>Grade Level</label>
+                        <label>Grade Level <span class="required">*</span></label>
                         <select name="grade_level" id="edit_detainee_grade_level" required>
                             <option value="">Select Grade Level</option>
                             <?php foreach($grade_levels as $gl): ?>
@@ -1144,7 +1235,8 @@ $providers = getAllProviders($conn);
                 <div class="form-row full">
                     <div class="form-group">
                         <label>Set new password</label>
-                        <input type="password" name="new_password" id="edit_detainee_new_password" placeholder="Leave blank to keep current password">
+                        <input type="password" name="new_password" id="edit_detainee_new_password" placeholder="Leave blank to keep current password" minlength="8" oninput="validatePassword(this)">
+                        <small class="password-hint">Minimum 8 characters required.</small>
                     </div>
                 </div>
                 <button type="submit">Update Student</button>
@@ -1162,11 +1254,11 @@ $providers = getAllProviders($conn);
             <input type="hidden" name="action" value="add_subject">
             <div class="form-row">
                 <div class="form-group">
-                    <label>Subject Code</label>
+                    <label>Subject Code <span class="required">*</span></label>
                     <input type="text" name="subject_code" required>
                 </div>
                 <div class="form-group">
-                    <label>Title</label>
+                    <label>Title <span class="required">*</span></label>
                     <input type="text" name="title" required>
                 </div>
             </div>
@@ -1180,7 +1272,7 @@ $providers = getAllProviders($conn);
                 <div class="form-group">
                     <label>Level</label>
                     <select name="level">
-                        <option value="">(Select level)</option>
+                        <option value="">Select level</option>
                         <option value="Elementary">Elementary</option>
                         <option value="High School">High School</option>
                         <option value="Senior High School">Senior High School</option>
@@ -1233,11 +1325,11 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="subject_id" id="edit_subject_id">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Subject Code</label>
+                        <label>Subject Code <span class="required">*</span></label>
                         <input type="text" name="subject_code" id="edit_subject_code" required>
                     </div>
                     <div class="form-group">
-                        <label>Title</label>
+                        <label>Title <span class="required">*</span></label>
                         <input type="text" name="title" id="edit_subject_title" required>
                     </div>
                 </div>
@@ -1251,7 +1343,7 @@ $providers = getAllProviders($conn);
                     <div class="form-group">
                         <label>Level</label>
                         <select name="level" id="edit_subject_level">
-                            <option value="">(Select level)</option>
+                            <option value="">Select level</option>
                             <option value="Elementary">Elementary</option>
                             <option value="High School">High School</option>
                             <option value="Senior High School">Senior High School</option>
@@ -1278,7 +1370,7 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="action" value="add_grade_level">
                 <div class="form-row full">
                     <div class="form-group">
-                        <label>Level</label>
+                        <label>Level <span class="required">*</span></label>
                         <input type="text" name="level" placeholder="e.g., Grade 7, Grade 8, Grade 9..." required>
                     </div>
                 </div>
@@ -1321,7 +1413,7 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="grade_level_id" id="edit_grade_level_id">
                 <div class="form-row full">
                     <div class="form-group">
-                        <label>Level</label>
+                        <label>Level <span class="required">*</span></label>
                         <input type="text" name="level" id="edit_grade_level_level" placeholder="e.g., Grade 7, Grade 8, Grade 9..." required>
                     </div>
                 </div>
@@ -1340,11 +1432,11 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="action" value="add_provider">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number</label>
+                        <label>ID Number <span class="required">*</span></label>
                         <input type="text" name="id_number" required>
                     </div>
                     <div class="form-group">
-                        <label>Name</label>
+                        <label>Name <span class="required">*</span></label>
                         <input type="text" name="name" required>
                     </div>
                 </div>
@@ -1401,11 +1493,11 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="provider_id" id="edit_provider_id">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number</label>
+                        <label>ID Number <span class="required">*</span></label>
                         <input type="text" name="id_number" id="edit_provider_id_number" required>
                     </div>
                     <div class="form-group">
-                        <label>Name</label>
+                        <label>Name <span class="required">*</span></label>
                         <input type="text" name="name" id="edit_provider_name" required>
                     </div>
                 </div>
