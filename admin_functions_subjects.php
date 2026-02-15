@@ -8,29 +8,55 @@
 /**
  * Add Subject
  * @param mysqli $conn
- * @param string $subject_code - Unique subject code
- * @param string $title - Unique subject title
+ * @param string $subject_code - Subject code (can be same for different levels)
+ * @param string $title - Subject title
  * @param string $description
+ * @param string $level - Educational level (Elementary, High School, etc.)
+ * @param string $resource_file - Optional file path
  * @return array - ['success' => bool, 'message' => string]
  */
 function addSubject($conn, $subject_code, $title, $description, $level = null, $resource_file = null) {
-    // Check for duplicate subject code
-    $checkStmt = $conn->prepare("SELECT id FROM subjects WHERE LOWER(subject_code) = LOWER(?)");
-    $checkStmt->bind_param("s", $subject_code);
-    $checkStmt->execute();
-    if ($checkStmt->get_result()->num_rows > 0) {
-        return ['success' => false, 'message' => '❌ Subject Code already exists'];
+    // Check for duplicate subject code + level combination
+    // This allows same subject code for different levels (e.g., PE for High School AND Senior High School)
+    if ($level !== null) {
+        $checkStmt = $conn->prepare("SELECT id FROM subjects WHERE LOWER(subject_code) = LOWER(?) AND LOWER(level) = LOWER(?) AND archived = 0");
+        $checkStmt->bind_param("ss", $subject_code, $level);
+        $checkStmt->execute();
+        if ($checkStmt->get_result()->num_rows > 0) {
+            return ['success' => false, 'message' => '❌ Subject Code already exists for this level'];
+        }
+        $checkStmt->close();
+    } else {
+        // If no level provided, check code alone (backward compatibility)
+        $checkStmt = $conn->prepare("SELECT id FROM subjects WHERE LOWER(subject_code) = LOWER(?) AND archived = 0");
+        $checkStmt->bind_param("s", $subject_code);
+        $checkStmt->execute();
+        if ($checkStmt->get_result()->num_rows > 0) {
+            return ['success' => false, 'message' => '❌ Subject Code already exists'];
+        }
+        $checkStmt->close();
     }
-    $checkStmt->close();
     
-    // Check for duplicate title
-    $checkStmt = $conn->prepare("SELECT id FROM subjects WHERE LOWER(title) = LOWER(?)");
-    $checkStmt->bind_param("s", $title);
-    $checkStmt->execute();
-    if ($checkStmt->get_result()->num_rows > 0) {
-        return ['success' => false, 'message' => '❌ Subject Title already exists'];
+    // Check for duplicate title + level combination
+    // This allows same title for different levels
+    if ($level !== null) {
+        $checkStmt = $conn->prepare("SELECT id FROM subjects WHERE LOWER(title) = LOWER(?) AND LOWER(level) = LOWER(?) AND archived = 0");
+        $checkStmt->bind_param("ss", $title, $level);
+        $checkStmt->execute();
+        if ($checkStmt->get_result()->num_rows > 0) {
+            return ['success' => false, 'message' => '❌ Subject Title already exists for this level'];
+        }
+        $checkStmt->close();
+    } else {
+        // If no level provided, check title alone (backward compatibility)
+        $checkStmt = $conn->prepare("SELECT id FROM subjects WHERE LOWER(title) = LOWER(?) AND archived = 0");
+        $checkStmt->bind_param("s", $title);
+        $checkStmt->execute();
+        if ($checkStmt->get_result()->num_rows > 0) {
+            return ['success' => false, 'message' => '❌ Subject Title already exists'];
+        }
+        $checkStmt->close();
     }
-    $checkStmt->close();
     
     // Build insert dynamically to support optional columns like level and resource_file
     $cols = ['subject_code','title','description'];
@@ -78,23 +104,45 @@ function addSubject($conn, $subject_code, $title, $description, $level = null, $
  * Edit Subject
  */
 function editSubject($conn, $subject_id, $subject_code, $title, $description, $level = null, $resource_file = null) {
-    // Check if new code exists elsewhere
-    $checkStmt = $conn->prepare("SELECT id FROM subjects WHERE LOWER(subject_code) = LOWER(?) AND id != ?");
-    $checkStmt->bind_param("si", $subject_code, $subject_id);
-    $checkStmt->execute();
-    if ($checkStmt->get_result()->num_rows > 0) {
-        return ['success' => false, 'message' => '❌ Subject Code already exists'];
+    // Check if new code + level combination exists elsewhere
+    if ($level !== null) {
+        $checkStmt = $conn->prepare("SELECT id FROM subjects WHERE LOWER(subject_code) = LOWER(?) AND LOWER(level) = LOWER(?) AND id != ? AND archived = 0");
+        $checkStmt->bind_param("ssi", $subject_code, $level, $subject_id);
+        $checkStmt->execute();
+        if ($checkStmt->get_result()->num_rows > 0) {
+            return ['success' => false, 'message' => '❌ Subject Code already exists for this level'];
+        }
+        $checkStmt->close();
+    } else {
+        // If no level provided, check code alone
+        $checkStmt = $conn->prepare("SELECT id FROM subjects WHERE LOWER(subject_code) = LOWER(?) AND id != ? AND archived = 0");
+        $checkStmt->bind_param("si", $subject_code, $subject_id);
+        $checkStmt->execute();
+        if ($checkStmt->get_result()->num_rows > 0) {
+            return ['success' => false, 'message' => '❌ Subject Code already exists'];
+        }
+        $checkStmt->close();
     }
-    $checkStmt->close();
     
-    // Check if new title exists elsewhere
-    $checkStmt = $conn->prepare("SELECT id FROM subjects WHERE LOWER(title) = LOWER(?) AND id != ?");
-    $checkStmt->bind_param("si", $title, $subject_id);
-    $checkStmt->execute();
-    if ($checkStmt->get_result()->num_rows > 0) {
-        return ['success' => false, 'message' => '❌ Subject Title already exists'];
+    // Check if new title + level combination exists elsewhere
+    if ($level !== null) {
+        $checkStmt = $conn->prepare("SELECT id FROM subjects WHERE LOWER(title) = LOWER(?) AND LOWER(level) = LOWER(?) AND id != ? AND archived = 0");
+        $checkStmt->bind_param("ssi", $title, $level, $subject_id);
+        $checkStmt->execute();
+        if ($checkStmt->get_result()->num_rows > 0) {
+            return ['success' => false, 'message' => '❌ Subject Title already exists for this level'];
+        }
+        $checkStmt->close();
+    } else {
+        // If no level provided, check title alone
+        $checkStmt = $conn->prepare("SELECT id FROM subjects WHERE LOWER(title) = LOWER(?) AND id != ? AND archived = 0");
+        $checkStmt->bind_param("si", $title, $subject_id);
+        $checkStmt->execute();
+        if ($checkStmt->get_result()->num_rows > 0) {
+            return ['success' => false, 'message' => '❌ Subject Title already exists'];
+        }
+        $checkStmt->close();
     }
-    $checkStmt->close();
     
     // Build update dynamically
     $sets = ['subject_code = ?', 'title = ?', 'description = ?'];
@@ -158,9 +206,25 @@ function archiveSubject($conn, $subject_id) {
  * Get All Subjects (active only)
  */
 function getAllSubjects($conn, $includeArchived = false) {
-    $query = "SELECT * FROM subjects WHERE archived = 0 ORDER BY title ASC";
+    $query = "SELECT * FROM subjects WHERE archived = 0 ORDER BY 
+              CASE level
+                  WHEN 'Elementary' THEN 1
+                  WHEN 'High School' THEN 2
+                  WHEN 'Senior High School' THEN 3
+                  WHEN 'College' THEN 4
+                  ELSE 5
+              END,
+              title ASC";
     if ($includeArchived) {
-        $query = "SELECT * FROM subjects ORDER BY title ASC";
+        $query = "SELECT * FROM subjects ORDER BY 
+                  CASE level
+                      WHEN 'Elementary' THEN 1
+                      WHEN 'High School' THEN 2
+                      WHEN 'Senior High School' THEN 3
+                      WHEN 'College' THEN 4
+                      ELSE 5
+                  END,
+                  title ASC";
     }
     $result = $conn->query($query);
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];

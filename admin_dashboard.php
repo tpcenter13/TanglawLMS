@@ -147,33 +147,43 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     // ====== SUBJECT MANAGEMENT ======
     if ($action == 'add_subject') {
-        $subject_file_path = null;
-        if (!empty($_FILES['subject_file']['tmp_name'])) {
-            $upload_dir = 'uploads/subjects/';
-            if (!is_dir($upload_dir)) { mkdir($upload_dir, 0755, true); }
-            $fname = time() . '_' . basename($_FILES['subject_file']['name']);
-            $target = $upload_dir . $fname;
-            if (@move_uploaded_file($_FILES['subject_file']['tmp_name'], $target)) {
-                $subject_file_path = $target;
+        // Validate required fields including level
+        if (empty($_POST['subject_code']) || empty($_POST['title']) || empty($_POST['level'])) {
+            $message = '❌ Subject code, title, and level are required.';
+        } else {
+            $subject_file_path = null;
+            if (!empty($_FILES['subject_file']['tmp_name'])) {
+                $upload_dir = 'uploads/subjects/';
+                if (!is_dir($upload_dir)) { mkdir($upload_dir, 0755, true); }
+                $fname = time() . '_' . basename($_FILES['subject_file']['name']);
+                $target = $upload_dir . $fname;
+                if (@move_uploaded_file($_FILES['subject_file']['tmp_name'], $target)) {
+                    $subject_file_path = $target;
+                }
             }
+            $result = addSubject($conn, $_POST['subject_code'], $_POST['title'], $_POST['description'], $_POST['level'], $subject_file_path);
+            $message = $result['message'];
         }
-        $result = addSubject($conn, $_POST['subject_code'], $_POST['title'], $_POST['description'], $_POST['level'] ?? null, $subject_file_path);
-        $message = $result['message'];
     }
     
     if ($action == 'edit_subject') {
-        $subject_file_path = null;
-        if (!empty($_FILES['subject_file']['tmp_name'])) {
-            $upload_dir = 'uploads/subjects/';
-            if (!is_dir($upload_dir)) { mkdir($upload_dir, 0755, true); }
-            $fname = time() . '_' . basename($_FILES['subject_file']['name']);
-            $target = $upload_dir . $fname;
-            if (@move_uploaded_file($_FILES['subject_file']['tmp_name'], $target)) {
-                $subject_file_path = $target;
+        // Validate required fields including level
+        if (empty($_POST['subject_id']) || empty($_POST['subject_code']) || empty($_POST['title']) || empty($_POST['level'])) {
+            $message = '❌ Subject code, title, and level are required.';
+        } else {
+            $subject_file_path = null;
+            if (!empty($_FILES['subject_file']['tmp_name'])) {
+                $upload_dir = 'uploads/subjects/';
+                if (!is_dir($upload_dir)) { mkdir($upload_dir, 0755, true); }
+                $fname = time() . '_' . basename($_FILES['subject_file']['name']);
+                $target = $upload_dir . $fname;
+                if (@move_uploaded_file($_FILES['subject_file']['tmp_name'], $target)) {
+                    $subject_file_path = $target;
+                }
             }
+            $result = editSubject($conn, $_POST['subject_id'], $_POST['subject_code'], $_POST['title'], $_POST['description'], $_POST['level'], $subject_file_path);
+            $message = $result['message'];
         }
-        $result = editSubject($conn, $_POST['subject_id'], $_POST['subject_code'], $_POST['title'], $_POST['description'], $_POST['level'] ?? null, $subject_file_path);
-        $message = $result['message'];
     }
     
     if ($action == 'archive_subject') {
@@ -515,6 +525,17 @@ $providers = getAllProviders($conn);
                 if (schoolSelect && !schoolSelect.value) {
                     alert('School is required for students');
                     schoolSelect.focus();
+                    return false;
+                }
+            }
+
+            // Check required fields for subjects
+            if (form.querySelector('input[name="action"][value="add_subject"]') || 
+                form.querySelector('input[name="action"][value="edit_subject"]')) {
+                const levelSelect = form.querySelector('select[name="level"]');
+                if (levelSelect && !levelSelect.value) {
+                    alert('Level is required for subjects');
+                    levelSelect.focus();
                     return false;
                 }
             }
@@ -1244,83 +1265,105 @@ $providers = getAllProviders($conn);
         </div>
     </div>
 
-    <!-- SUBJECTS SECTION -->
-  <div class="section <?= $section == 'subjects' ? 'active' : '' ?>">
-    <h2>📚 Subject Management</h2>
-    
-    <div class="card">
-        <h3>Add New Subject</h3>
-        <form method="POST" enctype="multipart/form-data">
-            <input type="hidden" name="action" value="add_subject">
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Subject Code <span class="required">*</span></label>
-                    <input type="text" name="subject_code" required>
+    <!-- ========== SUBJECTS SECTION - UPDATED WITH GROUPING BY LEVEL ========== -->
+    <div class="section <?= $section == 'subjects' ? 'active' : '' ?>">
+        <h2>📚 Subject Management</h2>
+        
+        <div class="card">
+            <h3>Add New Subject</h3>
+            <form method="POST" enctype="multipart/form-data" onsubmit="return validateForm(this)">
+                <input type="hidden" name="action" value="add_subject">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Subject Code <span class="required">*</span></label>
+                        <input type="text" name="subject_code" required placeholder="e.g., PE, ENG, MAT">
+                    </div>
+                    <div class="form-group">
+                        <label>Title <span class="required">*</span></label>
+                        <input type="text" name="title" required placeholder="e.g., Physical Education">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Title <span class="required">*</span></label>
-                    <input type="text" name="title" required>
+                <div class="form-row full">
+                    <div class="form-group">
+                        <label>Level <span class="required">*</span></label>
+                        <select name="level" required>
+                            <option value="">Select level</option>
+                            <option value="Elementary">Elementary</option>
+                            <option value="High School">High School</option>
+                            <option value="Senior High School">Senior High School</option>
+                            <option value="College">College</option>
+                        </select>
+                    </div>
                 </div>
-            </div>
-            <div class="form-row full">
-                <div class="form-group">
-                    <label>Description</label>
-                    <input type="text" name="description" placeholder="Optional description">
+                <div class="form-row full">
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" name="description" placeholder="Optional description">
+                    </div>
                 </div>
-            </div>
-            <div class="form-row full">
-                <div class="form-group">
-                    <label>Level</label>
-                    <select name="level">
-                        <option value="">Select level</option>
-                        <option value="Elementary">Elementary</option>
-                        <option value="High School">High School</option>
-                        <option value="Senior High School">Senior High School</option>
-                        <option value="College">College</option>
-                    </select>
-                </div>
-            </div>
-            <button type="submit">Add Subject</button>
-        </form>
+                <button type="submit">Add Subject</button>
+            </form>
+        </div>
+
+        <?php
+            // Group subjects by level
+            $subjectGroups = [];
+            foreach ($subjects as $subj) {
+                $level = trim((string)($subj['level'] ?? 'Unspecified'));
+                if ($level === '') $level = 'Unspecified';
+                if (!isset($subjectGroups[$level])) $subjectGroups[$level] = [];
+                $subjectGroups[$level][] = $subj;
+            }
+
+            // Define level order
+            $levelOrder = ['Elementary', 'High School', 'Senior High School', 'College', 'Unspecified'];
+            
+            foreach ($levelOrder as $levelName) :
+                if (!isset($subjectGroups[$levelName])) continue;
+                $group = $subjectGroups[$levelName];
+        ?>
+        <h3 style="margin-top:24px;color:#0f172a;display:flex;align-items:center;gap:8px;">
+            <span style="display:inline-block;padding:6px 16px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border-radius:20px;font-size:14px;font-weight:600;">
+                <?= htmlspecialchars($levelName) ?>
+            </span>
+            <span style="font-size:16px;color:#64748b;">(<?= count($group) ?> subject<?= count($group) != 1 ? 's' : '' ?>)</span>
+        </h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Title</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($group as $subj): ?>
+                <tr>
+                    <td><strong style="color:#2563eb;"><?= htmlspecialchars($subj['subject_code']) ?></strong></td>
+                    <td><?= htmlspecialchars($subj['title']) ?></td>
+                    <td style="color:#64748b;"><?= htmlspecialchars($subj['description'] ?? '—') ?></td>
+                    <td class="action-buttons">
+                        <button class="btn-edit" onclick="editItem('subject', <?= htmlspecialchars(json_encode($subj)) ?>)">✎ Edit</button>
+                        <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this subject?')">
+                            <input type="hidden" name="action" value="archive_subject">
+                            <input type="hidden" name="subject_id" value="<?= $subj['id'] ?>">
+                            <button class="btn-delete" type="submit">🗑 Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php endforeach; ?>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Code</th>
-                <th>Title</th>
-                <th>Level</th>
-                <th>Description</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach($subjects as $subj): ?>
-            <tr>
-                <td><?= htmlspecialchars($subj['subject_code']) ?></td>
-                <td><?= htmlspecialchars($subj['title']) ?></td>
-                <td><?= htmlspecialchars($subj['level'] ?? '—') ?></td>
-                <td><?= htmlspecialchars($subj['description'] ?? '') ?></td>
-                <td class="action-buttons">
-                    <button class="btn-edit" onclick="editItem('subject', <?= htmlspecialchars(json_encode($subj)) ?>)">✎ Edit</button>
-                    <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this subject?')">
-                        <input type="hidden" name="action" value="archive_subject">
-                        <input type="hidden" name="subject_id" value="<?= $subj['id'] ?>">
-                        <button class="btn-delete" type="submit">🗑 Delete</button>
-                    </form>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
-</div>
-
-    <!-- Edit Subject Modal -->
+    <!-- Edit Subject Modal - UPDATED WITH REQUIRED LEVEL -->
     <div id="edit_subject_modal" class="modal">
         <div class="modal-content">
             <span class="modal-close" onclick="closeModal('edit_subject_modal')">&times;</span>
             <h2>Edit Subject</h2>
-            <form method="POST" enctype="multipart/form-data">
+            <form method="POST" enctype="multipart/form-data" onsubmit="return validateForm(this)">
                 <input type="hidden" name="action" value="edit_subject">
                 <input type="hidden" name="subject_id" id="edit_subject_id">
                 <div class="form-row">
@@ -1335,14 +1378,8 @@ $providers = getAllProviders($conn);
                 </div>
                 <div class="form-row full">
                     <div class="form-group">
-                        <label>Description</label>
-                        <input type="text" name="description" id="edit_subject_description" placeholder="Optional description">
-                    </div>
-                </div>
-                <div class="form-row full">
-                    <div class="form-group">
-                        <label>Level</label>
-                        <select name="level" id="edit_subject_level">
+                        <label>Level <span class="required">*</span></label>
+                        <select name="level" id="edit_subject_level" required>
                             <option value="">Select level</option>
                             <option value="Elementary">Elementary</option>
                             <option value="High School">High School</option>
@@ -1350,6 +1387,14 @@ $providers = getAllProviders($conn);
                             <option value="College">College</option>
                         </select>
                     </div>
+                </div>
+                <div class="form-row full">
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" name="description" id="edit_subject_description" placeholder="Optional description">
+                    </div>
+                </div>
+                <div class="form-row full">
                     <div class="form-group">
                         <label>Dropbox (Upload file)</label>
                         <input type="file" name="subject_file" accept=".pdf,.doc,.docx,.zip,.ppt,.pptx">
