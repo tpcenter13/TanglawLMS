@@ -202,15 +202,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         $grade = $_POST['grade'];
         $comments = $_POST['comments'];
         
-        $stmt = $conn->prepare("UPDATE activity_submissions SET grade = ?, comments = ?, status = 'graded' WHERE id = ? AND status = 'submitted'");
-        $stmt->bind_param('dsi', $grade, $comments, $submission_id);
-
-        if ($stmt->execute() && $stmt->affected_rows > 0) {
-            $message = 'Grade submitted successfully';
+        // Validate grade range (61-99)
+        if ($grade < 61 || $grade > 99) {
+            $message = '❌ Grade must be between 61 and 99';
         } else {
-            $message = 'Submission is not yet submitted by the student.';
+            $stmt = $conn->prepare("UPDATE activity_submissions SET grade = ?, comments = ?, status = 'graded' WHERE id = ? AND status = 'submitted'");
+            $stmt->bind_param('dsi', $grade, $comments, $submission_id);
+
+            if ($stmt->execute() && $stmt->affected_rows > 0) {
+                $message = '✅ Grade submitted successfully';
+            } else {
+                $message = '❌ Submission is not yet submitted by the student.';
+            }
+            $stmt->close();
         }
-        $stmt->close();
     }
     
     if ($action == 'generate_report_card') {
@@ -219,29 +224,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
         $quarter = $_POST['quarter'];
         $grade = $_POST['grade'];
         
-        // Check if report card exists
-        $checkStmt = $conn->prepare("SELECT id FROM report_cards WHERE detainee_id = ? AND subject_id = ? AND quarter = ?");
-        $checkStmt->bind_param("iii", $detainee_id, $subject_id, $quarter);
-        $checkStmt->execute();
-        
-        if ($checkStmt->get_result()->num_rows > 0) {
-            $updateStmt = $conn->prepare("UPDATE report_cards SET grade = ? WHERE detainee_id = ? AND subject_id = ? AND quarter = ?");
-            $updateStmt->bind_param("diii", $grade, $detainee_id, $subject_id, $quarter);
-            $updateStmt->execute();
-            $message = '✅ Report card updated';
-            $updateStmt->close();
+        // Validate grade range (61-99)
+        if ($grade < 61 || $grade > 99) {
+            $message = '❌ Grade must be between 61 and 99';
         } else {
-            $insertStmt = $conn->prepare("INSERT INTO report_cards (detainee_id, subject_id, teacher_id, quarter, grade) VALUES (?, ?, ?, ?, ?)");
-            $insertStmt->bind_param("iiiii", $detainee_id, $subject_id, $teacher_id, $quarter, $grade);
+            // Check if report card exists
+            $checkStmt = $conn->prepare("SELECT id FROM report_cards WHERE detainee_id = ? AND subject_id = ? AND quarter = ?");
+            $checkStmt->bind_param("iii", $detainee_id, $subject_id, $quarter);
+            $checkStmt->execute();
             
-            if ($insertStmt->execute()) {
-                $message = '✅ Report card created successfully';
+            if ($checkStmt->get_result()->num_rows > 0) {
+                $updateStmt = $conn->prepare("UPDATE report_cards SET grade = ? WHERE detainee_id = ? AND subject_id = ? AND quarter = ?");
+                $updateStmt->bind_param("diii", $grade, $detainee_id, $subject_id, $quarter);
+                $updateStmt->execute();
+                $message = '✅ Report card updated';
+                $updateStmt->close();
             } else {
-                $message = '❌ Error creating report card';
+                $insertStmt = $conn->prepare("INSERT INTO report_cards (detainee_id, subject_id, teacher_id, quarter, grade) VALUES (?, ?, ?, ?, ?)");
+                $insertStmt->bind_param("iiiii", $detainee_id, $subject_id, $teacher_id, $quarter, $grade);
+                
+                if ($insertStmt->execute()) {
+                    $message = '✅ Report card created successfully';
+                } else {
+                    $message = '❌ Error creating report card';
+                }
+                $insertStmt->close();
             }
-            $insertStmt->close();
+            $checkStmt->close();
         }
-        $checkStmt->close();
     }
 
     // ====== MODULE EDIT / DELETE ======
@@ -294,9 +304,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['action'])) {
                         $updateStmt->bind_param('siiisii', $title, $subject_id, $grade_level_id, $module_order, $newPath, $module_id, $teacher_id);
                     }
                     if ($updateStmt->execute()) {
-                        $message = 'Module updated successfully';
+                        $message = '✅ Module updated successfully';
                     } else {
-                        $message = 'Failed to update module';
+                        $message = '❌ Failed to update module';
                     }
                     $updateStmt->close();
                 }
@@ -1071,8 +1081,8 @@ $recentSubmissions = array_slice($submissions, 0, 5);
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Grade (0-100)</label>
-                        <input type="number" name="grade" min="0" max="100" step="0.5" required>
+                        <label>Grade (61-99)</label>
+                        <input type="number" name="grade" min="61" max="99" step="0.5" required>
                     </div>
                 </div>
                 <div class="form-row full">
@@ -1126,8 +1136,8 @@ $recentSubmissions = array_slice($submissions, 0, 5);
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Grade (0-100)</label>
-                        <input type="number" name="grade" min="0" max="100" step="0.5" required>
+                        <label>Grade (61-99)</label>
+                        <input type="number" name="grade" min="61" max="99" step="0.5" required>
                     </div>
                 </div>
                 <button type="submit">Generate Report Card</button>
@@ -1317,5 +1327,3 @@ $recentSubmissions = array_slice($submissions, 0, 5);
 
 </body>
 </html>
-
-

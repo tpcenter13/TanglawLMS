@@ -807,7 +807,7 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="action" value="add_teacher">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number <span class="required">*</span></label>
+                        <label>School Number <span class="required">*</span></label>
                         <input type="text" name="id_number" required>
                     </div>
                     <div class="form-group">
@@ -862,7 +862,7 @@ $providers = getAllProviders($conn);
         <table>
             <thead>
                 <tr>
-                    <th>ID Number</th>
+                    <th>School Number</th>
                     <th>Name</th>
                     <th>Position</th>
                     <th>Level</th>
@@ -908,7 +908,7 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="teacher_id" id="edit_teacher_id">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number <span class="required">*</span></label>
+                        <label>School number <span class="required">*</span></label>
                         <input type="text" name="id_number" id="edit_teacher_id_number" required>
                     </div>
                     <div class="form-group">
@@ -972,7 +972,7 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="action" value="add_facilitator">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number <span class="required">*</span></label>
+                        <label>School Number <span class="required">*</span></label>
                         <input type="text" name="id_number" required>
                     </div>
                     <div class="form-group">
@@ -1015,7 +1015,7 @@ $providers = getAllProviders($conn);
         <table>
             <thead>
                 <tr>
-                    <th>ID Number</th>
+                    <th>School Number</th>
                     <th>Name</th>
                     <th>Position</th>
                     <th>Employment Status</th>
@@ -1059,7 +1059,7 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="facilitator_id" id="edit_facilitator_id">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number <span class="required">*</span></label>
+                        <label>School Number <span class="required">*</span></label>
                         <input type="text" name="id_number" id="edit_facilitator_id_number" required>
                     </div>
                     <div class="form-group">
@@ -1109,7 +1109,7 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="action" value="add_detainee">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number <span class="required">*</span></label>
+                        <label>School Number <span class="required">*</span></label>
                         <input type="text" name="id_number" required>
                     </div>
                     <div class="form-group">
@@ -1173,7 +1173,7 @@ $providers = getAllProviders($conn);
         <table>
             <thead>
                 <tr>
-                    <th>ID Number</th>
+                    <th>School Number</th>
                     <th>Name</th>
                     <th>Grade Level</th>
                     <th>Actions</th>
@@ -1216,7 +1216,7 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="detainee_id" id="edit_detainee_id">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number <span class="required">*</span></label>
+                        <label>School Number <span class="required">*</span></label>
                         <input type="text" name="id_number" id="edit_detainee_id_number" required>
                     </div>
                     <div class="form-group">
@@ -1477,7 +1477,7 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="action" value="add_provider">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number <span class="required">*</span></label>
+                        <label>School Number <span class="required">*</span></label>
                         <input type="text" name="id_number" required>
                     </div>
                     <div class="form-group">
@@ -1502,7 +1502,7 @@ $providers = getAllProviders($conn);
         <table>
             <thead>
                 <tr>
-                    <th>ID Number</th>
+                    <th>School Number</th>
                     <th>Name</th>
                     <th>Type</th>
                     <th>Actions</th>
@@ -1538,7 +1538,7 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="provider_id" id="edit_provider_id">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>ID Number <span class="required">*</span></label>
+                        <label>School Number<span class="required">*</span></label>
                         <input type="text" name="id_number" id="edit_provider_id_number" required>
                     </div>
                     <div class="form-group">
