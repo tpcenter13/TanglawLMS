@@ -147,7 +147,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
     // ====== SUBJECT MANAGEMENT ======
     if ($action == 'add_subject') {
-        // Validate required fields including level
         if (empty($_POST['subject_code']) || empty($_POST['title']) || empty($_POST['level'])) {
             $message = '❌ Subject code, title, and level are required.';
         } else {
@@ -167,7 +166,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
     if ($action == 'edit_subject') {
-        // Validate required fields including level
         if (empty($_POST['subject_id']) || empty($_POST['subject_code']) || empty($_POST['title']) || empty($_POST['level'])) {
             $message = '❌ Subject code, title, and level are required.';
         } else {
@@ -274,6 +272,9 @@ $providers = getAllProviders($conn);
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="assets/css/portal-shared.css">
     <style>
+        /* ===== STUDENT DASHBOARD DESIGN APPLIED TO ADMIN ===== */
+
+        /* --- Header (matches student-header style) --- */
         .admin-header {
             background: linear-gradient(120deg, var(--portal-primary), var(--portal-primary-2));
             color: white;
@@ -288,160 +289,252 @@ $providers = getAllProviders($conn);
             align-items: center;
             justify-content: space-between;
             gap: 12px;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.12);
         }
-        body {
-            overflow: hidden;
+        .admin-header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
         }
-        html {
-            height: 100%;
+        .admin-header .header-meta {
+            margin: 2px 0 0;
+            font-size: 13px;
+            opacity: 0.82;
         }
-        .main-content { 
+        .admin-header a {
+            color: rgba(255,255,255,0.88);
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .admin-header a:hover { color: #fff; text-decoration: underline; }
+
+        body { overflow: hidden; }
+        html { height: 100%; }
+
+        .main-content {
             margin-left: 280px;
             padding-top: 110px;
             padding-bottom: 60px;
             height: 100vh;
             overflow-y: auto;
         }
-        .main-content .container {
-            max-width: 1400px;
+        .main-container {
+            max-width: 1200px;
             margin: 0 auto;
             padding: 0 24px;
+            margin-top: 70px;
         }
-        
-        .section { 
-            display: none; 
+
+        /* --- Section title (matches student .section-title) --- */
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 28px 0 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
         }
-        .section.active { 
-            display: block;
-            max-width: 100%;
-            margin: 0;
-        }
-        .section.active .grid {
+
+        /* --- Stats grid (matches student .stats-grid / .stat-card) --- */
+        .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 20px;
-            margin-bottom: 24px;
-            max-width: 1200px;
-            margin-left: auto;
-            margin-right: auto;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
         }
-        
-        @media (max-width: 1200px) {
-            .section.active .grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .section.active .grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 1024px) {
-            .admin-header {
-                left: 260px;
-                width: calc(100% - 260px);
-            }
-            .main-content {
-                margin-left: 260px;
-                padding-top: 110px;
-            }
-        }
-
-        @media (max-width: 900px) {
-            .admin-header {
-                left: 0;
-                width: 100%;
-            }
-            .main-content {
-                margin-left: 0;
-                padding: 120px 16px 48px;
-            }
-        }
-
-        .section.dashboard-scrollable .grid-wrapper {
-            max-height: 60vh;
-            overflow-y: auto;
-            padding-right: 8px;
-        }
-        .section.active .grid .card {
+        .stat-card {
             background: white;
-            padding: 20px;
+            border-radius: 16px;
+            padding: 20px 18px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 14px rgba(15,23,42,0.06);
+            text-align: center;
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+        .stat-card:hover {
+            box-shadow: 0 8px 24px rgba(15,23,42,0.12);
+            transform: translateY(-2px);
+        }
+        .stat-card .kpi {
+            font-size: 36px;
+            font-weight: 800;
+            color: var(--portal-primary, #4f772d);
+            line-height: 1.1;
+            margin-bottom: 6px;
+        }
+        .stat-card .label {
+            font-size: 13px;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        /* --- Content sections --- */
+        .section { display: none; }
+        .section.active { display: block; }
+
+        /* --- Form card (matches student .card) --- */
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 14px rgba(15,23,42,0.06);
+            margin-bottom: 24px;
+        }
+        .card h3 {
+            margin: 0 0 18px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        /* --- Tables --- */
+        .table-card {
+            background: white;
             border-radius: 16px;
             border: 1px solid #e2e8f0;
-            box-shadow: 0 12px 28px rgba(15,23,42,0.08);
-        }
-        .section h2 {
-            margin-top: 0;
+            box-shadow: 0 4px 14px rgba(15,23,42,0.06);
+            overflow: hidden;
             margin-bottom: 24px;
         }
-        .section .card {
-            margin-top: 0;
-            margin-bottom: 20px;
+        table { width: 100%; border-collapse: collapse; }
+        table thead { background: #f8fafc; }
+        table th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #e2e8f0;
         }
-        .section .grid {
-            margin-top: 0;
-            margin-bottom: 20px;
+        table td {
+            padding: 13px 16px;
+            font-size: 14px;
+            color: #334155;
+            border-bottom: 1px solid #f1f5f9;
         }
+        table tbody tr:last-child td { border-bottom: none; }
+        table tbody tr:hover { background: #f8fafc; }
+
+        /* --- Form elements --- */
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
         .form-row.full { grid-template-columns: 1fr; }
         .form-group { display: flex; flex-direction: column; }
-        .form-group label { font-weight: 600; margin-bottom: 5px; }
+        .form-group label { font-weight: 600; margin-bottom: 5px; font-size: 13px; color: #374151; }
         .form-group label .required { color: #dc2626; font-weight: 700; }
         .form-group input, .form-group select {
             padding: 10px 12px;
             border: 1px solid #d1d5db;
             border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
-        .form-group input:invalid:not(:placeholder-shown), 
-        .form-group select:invalid:not(:placeholder-shown) {
-            border-color: #dc2626;
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--portal-primary, #4f772d);
+            box-shadow: 0 0 0 3px rgba(79,119,45,0.12);
         }
-        .password-hint {
-            font-size: 12px;
-            color: #6b7280;
-            margin-top: 4px;
-        }
+        .password-hint { font-size: 12px; color: #6b7280; margin-top: 4px; }
+
         button[type="submit"] {
-            background:#4f772d;
+            background: var(--portal-primary, #4f772d);
             color: white;
-            padding: 10px 20px;
+            padding: 10px 22px;
             border: none;
-            border-radius: 6px;
+            border-radius: 10px;
             cursor: pointer;
             font-weight: 600;
+            font-size: 14px;
+            transition: background 0.2s;
         }
         button[type="submit"]:hover { background: #15803d; }
-        .alert { padding: 12px; border-radius: 6px; margin-bottom: 15px; }
-        .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-        .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        table thead { background: #f3f4f6; }
-        table th, table td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
-        .btn-edit { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 5px; display: inline-block; text-align: center; background: #2563eb; color: white; }
-        .btn-delete { padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-right: 5px; display: inline-block; text-align: center; background: #ef4444 !important; color: white; line-height: 1; vertical-align: middle; }
+
+        /* --- Action buttons --- */
+        .btn-edit {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 5px;
+            display: inline-block;
+            text-align: center;
+            background: #2563eb;
+            color: white;
+            transition: background 0.2s;
+        }
         .btn-edit:hover { background: #1d4ed8; }
-        .btn-delete:hover { background: #dc2626 !important; }
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); }
-        .modal.show { display: block; }
-        .modal-content { background-color: white; margin: 10% auto; padding: 30px; border-radius: 8px; width: 500px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .modal-close { color: #999; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-        .modal-close:hover { color: #000; }
-        .modal h2 { margin-top: 0; }
+        .btn-delete {
+            padding: 6px 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 5px;
+            display: inline-block;
+            text-align: center;
+            background: #ef4444;
+            color: white;
+            transition: background 0.2s;
+        }
+        .btn-delete:hover { background: #dc2626; }
         .action-buttons { white-space: nowrap; }
 
-        /* ===== NOTIFICATION MODAL ===== */
-        #notif_modal {
-            z-index: 2000;
+        /* --- Group headings --- */
+        .group-heading {
+            margin: 24px 0 12px;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 16px;
+            font-weight: 700;
         }
+        .group-badge {
+            display: inline-block;
+            padding: 5px 14px;
+            background: linear-gradient(135deg, #4f772d, #15803d);
+            color: white;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .group-count {
+            font-size: 14px;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        /* --- Modals --- */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); }
+        .modal.show { display: block; }
+        .modal-content {
+            background-color: white;
+            margin: 8% auto;
+            padding: 30px;
+            border-radius: 16px;
+            width: 520px;
+            max-width: 94vw;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+        }
+        .modal-close { color: #999; float: right; font-size: 26px; font-weight: bold; cursor: pointer; line-height: 1; }
+        .modal-close:hover { color: #000; }
+        .modal h2 { margin-top: 0; font-size: 18px; color: #1e293b; }
+
+        /* --- Notification modal --- */
+        #notif_modal { z-index: 2000; }
         #notif_modal .modal-content {
             margin: 19% auto;
             width: 380px;
             max-width: 90%;
             padding: 36px 28px 28px;
             text-align: center;
-            border-radius: 14px;
+            border-radius: 16px;
             position: relative;
             animation: notifPop 0.25s ease;
         }
@@ -450,41 +543,39 @@ $providers = getAllProviders($conn);
             100% { transform: scale(1);    opacity: 1; }
         }
         #notif_modal .notif-close-btn {
-            position: absolute;
-            top: 10px;
-            right: 16px;
-            font-size: 24px;
-            color: #999;
-            cursor: pointer;
-            background: none;
-            border: none;
-            line-height: 1;
+            position: absolute; top: 10px; right: 16px;
+            font-size: 24px; color: #999; cursor: pointer;
+            background: none; border: none; line-height: 1;
         }
         #notif_modal .notif-close-btn:hover { color: #333; }
         #notif_modal .notif-icon  { font-size: 42px; margin-bottom: 8px; }
         #notif_modal .notif-text  { margin: 0; font-size: 16px; font-weight: 600; }
-
-        /* progress bar at the bottom of the card */
         #notif_modal .notif-bar-wrap {
-            margin-top: 18px;
-            height: 4px;
-            background: rgba(0,0,0,0.08);
-            border-radius: 2px;
-            overflow: hidden;
+            margin-top: 18px; height: 4px;
+            background: rgba(0,0,0,0.08); border-radius: 2px; overflow: hidden;
         }
         #notif_modal .notif-bar {
-            height: 100%;
-            width: 100%;
-            border-radius: 2px;
+            height: 100%; width: 100%; border-radius: 2px;
             animation: notifDrain 3s linear forwards;
         }
-        @keyframes notifDrain {
-            0%   { width: 100%; }
-            100% { width: 0%; }
+        @keyframes notifDrain { 0% { width: 100%; } 100% { width: 0%; } }
+
+        /* --- Responsive --- */
+        @media (max-width: 1024px) {
+            .admin-header { left: 260px; width: calc(100% - 260px); }
+            .main-content { margin-left: 260px; }
+        }
+        @media (max-width: 900px) {
+            .admin-header { left: 0; width: 100%; }
+            .main-content { margin-left: 0; padding: 120px 16px 48px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .form-row { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 480px) {
+            .stats-grid { grid-template-columns: 1fr; }
         }
     </style>
     <script>
-        // Client-side password validation
         function validatePassword(input) {
             if (input.value.length > 0 && input.value.length < 8) {
                 input.setCustomValidity('Password must be at least 8 characters long');
@@ -493,11 +584,9 @@ $providers = getAllProviders($conn);
             }
         }
 
-        // Validate form before submission
         function validateForm(form) {
             const passwordInputs = form.querySelectorAll('input[type="password"]');
             let isValid = true;
-
             passwordInputs.forEach(input => {
                 if (input.value.length > 0 && input.value.length < 8) {
                     alert('Password must be at least 8 characters long');
@@ -506,8 +595,6 @@ $providers = getAllProviders($conn);
                     return false;
                 }
             });
-
-            // Check required fields for teachers
             if (form.querySelector('input[name="action"][value="add_teacher"]') || 
                 form.querySelector('input[name="action"][value="edit_teacher"]')) {
                 const providerSelect = form.querySelector('select[name="provider_id"]');
@@ -517,8 +604,6 @@ $providers = getAllProviders($conn);
                     return false;
                 }
             }
-
-            // Check required fields for students
             if (form.querySelector('input[name="action"][value="add_detainee"]') || 
                 form.querySelector('input[name="action"][value="edit_detainee"]')) {
                 const schoolSelect = form.querySelector('select[name="school"]');
@@ -528,8 +613,6 @@ $providers = getAllProviders($conn);
                     return false;
                 }
             }
-
-            // Check required fields for subjects
             if (form.querySelector('input[name="action"][value="add_subject"]') || 
                 form.querySelector('input[name="action"][value="edit_subject"]')) {
                 const levelSelect = form.querySelector('select[name="level"]');
@@ -539,21 +622,17 @@ $providers = getAllProviders($conn);
                     return false;
                 }
             }
-
             return isValid;
         }
 
-        function openModal(modalId) {
-            document.getElementById(modalId).classList.add('show');
-        }
-        function closeModal(modalId) {
-            document.getElementById(modalId).classList.remove('show');
-        }
+        function openModal(modalId) { document.getElementById(modalId).classList.add('show'); }
+        function closeModal(modalId) { document.getElementById(modalId).classList.remove('show'); }
         window.onclick = function(event) {
             if (event.target.classList.contains('modal') && event.target.id !== 'notif_modal') {
                 event.target.classList.remove('show');
             }
         }
+
         function editItem(type, data) {
             openModal(`edit_${type}_modal`);
             if (type == 'teacher') {
@@ -607,7 +686,6 @@ $providers = getAllProviders($conn);
             }
         }
 
-        /* ===== show the notification modal ===== */
         function showNotifModal(message) {
             var isSuccess  = message.indexOf('✅') !== -1;
             var modal      = document.getElementById('notif_modal');
@@ -615,8 +693,6 @@ $providers = getAllProviders($conn);
             var icon       = modal.querySelector('.notif-icon');
             var text       = modal.querySelector('.notif-text');
             var bar        = modal.querySelector('.notif-bar');
-
-            // colours
             if (isSuccess) {
                 card.style.background = '#dcfce7';
                 card.style.border    = '1px solid #bbf7d0';
@@ -628,71 +704,49 @@ $providers = getAllProviders($conn);
                 text.style.color     = '#991b1b';
                 bar.style.background = '#ef4444';
             }
-
             icon.textContent = isSuccess ? '✅' : '❌';
             text.textContent = message;
-
-            // restart progress-bar animation
             bar.style.animation = 'none';
-            void bar.offsetWidth; // force reflow
+            void bar.offsetWidth;
             bar.style.animation = 'notifDrain 3s linear forwards';
-
             modal.style.display = 'block';
-
-            // auto-close after 3 s
             setTimeout(function(){ modal.style.display = 'none'; }, 3000);
         }
     </script>
     <script>
-        // Build grade arrays from PHP-provided grade levels
         var allGrades = [];
         <?php foreach($grade_levels as $gl): ?>
         allGrades.push(<?= json_encode($gl['level']) ?>);
         <?php endforeach; ?>
 
-       function setDetaineeGradeOptions(school, selectEl) {
-    if (!selectEl) return;
-
-    var val = (school || '').trim().toLowerCase();
-    var allowed = [];
-
-    if (val.includes('marcelo') || val.includes('st') || val.includes('st. martin') || val.includes('st martin')) {
-        allowed = allGrades.filter(g => 
-            ['Grade 11', 'Grade 12', 'grade 11', 'grade 12']
-                .some(pattern => g.toLowerCase() === pattern)
-        );
-    } 
-    else if (val.includes('als')) {
-        allowed = allGrades.filter(g => 
-            ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 
-             'grade 7', 'grade 8', 'grade 9', 'grade 10']
-                .some(pattern => g.toLowerCase() === pattern)
-        );
-    } 
-    else {
-        allowed = allGrades.slice();
-    }
-
-    selectEl.innerHTML = '';
-
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = 'Select Grade Level';
-    selectEl.appendChild(placeholder);
-
-    allowed.sort((a, b) => {
-        const numA = parseInt(a.replace(/\D/g, '')) || 0;
-        const numB = parseInt(b.replace(/\D/g, '')) || 0;
-        return numA - numB;
-    });
-
-    allowed.forEach(g => {
-        const opt = document.createElement('option');
-        opt.value = g;
-        opt.textContent = g;
-        selectEl.appendChild(opt);
-    });
-}
+        function setDetaineeGradeOptions(school, selectEl) {
+            if (!selectEl) return;
+            var val = (school || '').trim().toLowerCase();
+            var allowed = [];
+            if (val.includes('marcelo') || val.includes('st') || val.includes('st. martin') || val.includes('st martin')) {
+                allowed = allGrades.filter(g => ['Grade 11', 'Grade 12', 'grade 11', 'grade 12'].some(pattern => g.toLowerCase() === pattern));
+            } else if (val.includes('als')) {
+                allowed = allGrades.filter(g => ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10', 'grade 7', 'grade 8', 'grade 9', 'grade 10'].some(pattern => g.toLowerCase() === pattern));
+            } else {
+                allowed = allGrades.slice();
+            }
+            selectEl.innerHTML = '';
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Select Grade Level';
+            selectEl.appendChild(placeholder);
+            allowed.sort((a, b) => {
+                const numA = parseInt(a.replace(/\D/g, '')) || 0;
+                const numB = parseInt(b.replace(/\D/g, '')) || 0;
+                return numA - numB;
+            });
+            allowed.forEach(g => {
+                const opt = document.createElement('option');
+                opt.value = g;
+                opt.textContent = g;
+                selectEl.appendChild(opt);
+            });
+        }
 
         document.addEventListener('DOMContentLoaded', function(){
             var addSchool = document.getElementById('add_detainee_school');
@@ -701,27 +755,18 @@ $providers = getAllProviders($conn);
                 addSchool.addEventListener('change', function(){ setDetaineeGradeOptions(this.value, addGrade); });
                 setDetaineeGradeOptions(addSchool.value, addGrade);
             }
-
-            // Add password validation listeners
             const passwordInputs = document.querySelectorAll('input[type="password"]');
             passwordInputs.forEach(input => {
-                input.addEventListener('input', function() {
-                    validatePassword(this);
-                });
+                input.addEventListener('input', function() { validatePassword(this); });
             });
         });
-       
     </script>
     <script>
         function toggleSidebar() {
             var body = document.body;
             var backdrop = document.getElementById('sidebarBackdrop');
             if (window.innerWidth <= 900) {
-                if (body.classList.contains('sidebar-open')) {
-                    body.classList.remove('sidebar-open');
-                } else {
-                    body.classList.add('sidebar-open');
-                }
+                body.classList.toggle('sidebar-open');
             } else {
                 body.classList.toggle('sidebar-collapsed');
             }
@@ -738,16 +783,22 @@ $providers = getAllProviders($conn);
 
 <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()" style="display:none"></div>
 
+<!-- ===== HEADER (matches student-header design) ===== -->
 <header class="admin-header portal-header">
-    <div style="display:flex;align-items:center;gap:12px">
-        <a href="#" style="color:#fff;font-weight:700;text-decoration:none;font-size:18px">TANGLAW LEARN</a>
+    <div>
+        <h1>Tanglaw Learn</h1>
+        <p class="header-meta">Admin Dashboard</p>
     </div>
-    <div></div>
+    <p style="margin:0;font-size:14px;">
+        <?php if(isset($_SESSION['loggedUser'])): ?>
+            <?= htmlspecialchars($_SESSION['loggedUser']['name'] ?? 'Admin') ?> | <a href="logout.php">Logout</a>
+        <?php endif; ?>
+    </p>
 </header>
 
 <div class="main-content portal-main">
 
-    <!-- ===== NOTIFICATION MODAL (replaces the old top alert) ===== -->
+    <!-- Notification Modal -->
     <div id="notif_modal" class="modal" style="display:none;">
         <div class="modal-content">
             <button class="notif-close-btn" onclick="document.getElementById('notif_modal').style.display='none'">&times;</button>
@@ -757,7 +808,6 @@ $providers = getAllProviders($conn);
         </div>
     </div>
 
-    <!-- fire the modal if PHP set $message -->
     <?php if ($message): ?>
     <script>
         document.addEventListener('DOMContentLoaded', function(){
@@ -766,40 +816,42 @@ $providers = getAllProviders($conn);
     </script>
     <?php endif; ?>
 
-    <!-- DASHBOARD SECTION -->
-   <br> <br> <br>
+    <div class="main-container">
+
+    <!-- ===== DASHBOARD SECTION ===== -->
     <div class="section <?= $section == 'dashboard' ? 'active' : '' ?>">
-        <div class="grid">
-            <div class="card">
+        <h2 class="section-title">Quick Overview</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
                 <div class="kpi"><?= count($teachers) ?></div>
-                <p class="small">👨‍🏫 Teachers</p>
+                <div class="label">Teachers</div>
             </div>
-            <div class="card">
+            <div class="stat-card">
                 <div class="kpi"><?= count($facilitators) ?></div>
-                <p class="small">👥 Facilitators</p>
+                <div class="label">Facilitators</div>
             </div>
-            <div class="card">
+            <div class="stat-card">
                 <div class="kpi"><?= count($detainees) ?></div>
-                <p class="small">👨‍🎓 Students</p>
+                <div class="label">Students</div>
             </div>
-            <div class="card">
+            <div class="stat-card">
                 <div class="kpi"><?= count($subjects) ?></div>
-                <p class="small">📚 Subjects</p>
+                <div class="label">Subjects</div>
             </div>
-            <div class="card">
+            <div class="stat-card">
                 <div class="kpi"><?= count($grade_levels) ?></div>
-                <p class="small">📊 Grade Levels</p>
+                <div class="label">Grade Levels</div>
             </div>
-            <div class="card">
+            <div class="stat-card">
                 <div class="kpi"><?= count($providers) ?></div>
-                <p class="small">🏢 Providers</p>
+                <div class="label">Providers</div>
             </div>
         </div>
     </div>
 
-    <!-- TEACHERS SECTION -->
+    <!-- ===== TEACHERS SECTION ===== -->
     <div class="section <?= $section == 'teachers' ? 'active' : '' ?>">
-        <h2>👨‍🏫 Teacher Management</h2>
+        <h2 class="section-title">Teacher Management</h2>
         
         <div class="card">
             <h3>Add New Teacher</h3>
@@ -821,7 +873,7 @@ $providers = getAllProviders($conn);
                         <input type="email" name="email" placeholder="user@example.com">
                     </div>
                 </div>
-                <div class="form-row full">
+                <div class="form-row">
                     <div class="form-group">
                         <label>Position</label>
                         <input type="text" name="position" placeholder="e.g., Science Teacher">
@@ -859,43 +911,45 @@ $providers = getAllProviders($conn);
             </form>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>School Number</th>
-                    <th>Name</th>
-                    <th>Position</th>
-                    <th>Level</th>
-                    <th>School</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach($teachers as $teacher): ?>
-                <tr>
-                    <td><?= htmlspecialchars($teacher['id_number']) ?></td>
-                    <td><?= htmlspecialchars($teacher['name']) ?></td>
-                    <td><?= htmlspecialchars($teacher['position'] ?? 'N/A') ?></td>
-                    <td><?= htmlspecialchars($teacher['level'] ?? '—') ?></td>
-                    <td><?= htmlspecialchars($teacher['provider_name'] ?? '—') ?></td>
-                    <td class="action-buttons">
-                        <button class="btn-edit" onclick="editItem('teacher', <?= htmlspecialchars(json_encode($teacher)) ?>)">✎ Edit</button>
-                        <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this teacher?')">
-                            <input type="hidden" name="action" value="archive_teacher">
-                            <input type="hidden" name="teacher_id" value="<?= $teacher['id'] ?>">
-                            <button class="btn-delete" type="submit">🗑 Delete</button>
-                        </form>
-                        <form style="display:inline; margin-left:6px;" method="POST" onsubmit="return confirm('Send password reset email to this teacher?')">
-                            <input type="hidden" name="action" value="send_reset_email">
-                            <input type="hidden" name="role" value="teacher">
-                            <input type="hidden" name="user_id" value="<?= $teacher['id'] ?>">
-                            <button type="submit" style="background:#06b6d4;color:white;border:0;padding:6px;border-radius:6px;">📧 Reset</button>
-                        </form>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>School Number</th>
+                        <th>Name</th>
+                        <th>Position</th>
+                        <th>Level</th>
+                        <th>School</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach($teachers as $teacher): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($teacher['id_number']) ?></td>
+                        <td><?= htmlspecialchars($teacher['name']) ?></td>
+                        <td><?= htmlspecialchars($teacher['position'] ?? 'N/A') ?></td>
+                        <td><?= htmlspecialchars($teacher['level'] ?? '—') ?></td>
+                        <td><?= htmlspecialchars($teacher['provider_name'] ?? '—') ?></td>
+                        <td class="action-buttons">
+                            <button class="btn-edit" onclick="editItem('teacher', <?= htmlspecialchars(json_encode($teacher)) ?>)">✎ Edit</button>
+                            <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this teacher?')">
+                                <input type="hidden" name="action" value="archive_teacher">
+                                <input type="hidden" name="teacher_id" value="<?= $teacher['id'] ?>">
+                                <button class="btn-delete" type="submit">🗑</button>
+                            </form>
+                            <form style="display:inline; margin-left:4px;" method="POST" onsubmit="return confirm('Send password reset email to this teacher?')">
+                                <input type="hidden" name="action" value="send_reset_email">
+                                <input type="hidden" name="role" value="teacher">
+                                <input type="hidden" name="user_id" value="<?= $teacher['id'] ?>">
+                                <button type="submit" style="background:#06b6d4;color:white;border:0;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;">📧</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- Edit Teacher Modal -->
@@ -922,7 +976,7 @@ $providers = getAllProviders($conn);
                         <input type="email" name="email" id="edit_teacher_email" placeholder="user@example.com">
                     </div>
                 </div>
-                <div class="form-row full">
+                <div class="form-row">
                     <div class="form-group">
                         <label>Position</label>
                         <input type="text" name="position" id="edit_teacher_position" placeholder="e.g., Science Teacher">
@@ -949,7 +1003,7 @@ $providers = getAllProviders($conn);
                         </select>
                     </div>
                 </div>
-                <div class="form-row">
+                <div class="form-row full">
                     <div class="form-group">
                         <label>Set new password</label>
                         <input type="password" name="new_password" id="edit_teacher_new_password" placeholder="Leave blank to keep current password" minlength="8" oninput="validatePassword(this)">
@@ -961,10 +1015,9 @@ $providers = getAllProviders($conn);
         </div>
     </div>
 
-
-    <!-- FACILITATORS SECTION -->
+    <!-- ===== FACILITATORS SECTION ===== -->
     <div class="section <?= $section == 'facilitators' ? 'active' : '' ?>">
-        <h2>👥 Facilitator Management</h2>
+        <h2 class="section-title">Facilitator Management</h2>
         
         <div class="card">
             <h3>Add New Facilitator</h3>
@@ -1011,42 +1064,43 @@ $providers = getAllProviders($conn);
             </form>
         </div>
 
-
-        <table>
-            <thead>
-                <tr>
-                    <th>School Number</th>
-                    <th>Name</th>
-                    <th>Position</th>
-                    <th>Employment Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach($facilitators as $fac): ?>
-                <tr>
-                    <td><?= htmlspecialchars($fac['id_number']) ?></td>
-                    <td><?= htmlspecialchars($fac['name']) ?></td>
-                    <td><?= htmlspecialchars($fac['position'] ?? 'N/A') ?></td>
-                    <td><?= htmlspecialchars($fac['employment_status'] ?? 'N/A') ?></td>
-                    <td class="action-buttons">
-                        <button class="btn-edit" onclick="editItem('facilitator', <?= htmlspecialchars(json_encode($fac)) ?>)">✎ Edit</button>
-                        <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this facilitator?')">
-                            <input type="hidden" name="action" value="archive_facilitator">
-                            <input type="hidden" name="facilitator_id" value="<?= $fac['id'] ?>">
-                            <button class="btn-delete" type="submit">🗑 Delete</button>
-                        </form>
-                        <form style="display:inline; margin-left:6px;" method="POST" onsubmit="return confirm('Send password reset email to this facilitator?')">
-                            <input type="hidden" name="action" value="send_reset_email">
-                            <input type="hidden" name="role" value="facilitator">
-                            <input type="hidden" name="user_id" value="<?= $fac['id'] ?>">
-                            <button type="submit" style="background:#06b6d4;color:white;border:0;padding:6px;border-radius:6px;">📧 Reset</button>
-                        </form>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>School Number</th>
+                        <th>Name</th>
+                        <th>Position</th>
+                        <th>Employment Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach($facilitators as $fac): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($fac['id_number']) ?></td>
+                        <td><?= htmlspecialchars($fac['name']) ?></td>
+                        <td><?= htmlspecialchars($fac['position'] ?? 'N/A') ?></td>
+                        <td><?= htmlspecialchars($fac['employment_status'] ?? 'N/A') ?></td>
+                        <td class="action-buttons">
+                            <button class="btn-edit" onclick="editItem('facilitator', <?= htmlspecialchars(json_encode($fac)) ?>)">✎ Edit</button>
+                            <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this facilitator?')">
+                                <input type="hidden" name="action" value="archive_facilitator">
+                                <input type="hidden" name="facilitator_id" value="<?= $fac['id'] ?>">
+                                <button class="btn-delete" type="submit">🗑</button>
+                            </form>
+                            <form style="display:inline; margin-left:4px;" method="POST" onsubmit="return confirm('Send password reset email to this facilitator?')">
+                                <input type="hidden" name="action" value="send_reset_email">
+                                <input type="hidden" name="role" value="facilitator">
+                                <input type="hidden" name="user_id" value="<?= $fac['id'] ?>">
+                                <button type="submit" style="background:#06b6d4;color:white;border:0;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;">📧</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- Edit Facilitator Modal -->
@@ -1099,9 +1153,9 @@ $providers = getAllProviders($conn);
         </div>
     </div>
 
-    <!-- DETAINEES SECTION -->
+    <!-- ===== STUDENTS SECTION ===== -->
     <div class="section <?= $section == 'detainees' ? 'active' : '' ?>">
-        <h2>👨‍🎓 Student Management</h2>
+        <h2 class="section-title">Student Management</h2>
         
         <div class="card">
             <h3>Add New Student</h3>
@@ -1157,7 +1211,6 @@ $providers = getAllProviders($conn);
             </form>
         </div>
 
-
         <?php
             $detaineeGroups = [];
             foreach ($detainees as $det) {
@@ -1166,47 +1219,51 @@ $providers = getAllProviders($conn);
                 if (!isset($detaineeGroups[$school])) $detaineeGroups[$school] = [];
                 $detaineeGroups[$school][] = $det;
             }
-
             foreach ($detaineeGroups as $schoolName => $group) :
         ?>
-        <h3 style="margin-top:18px;">🏫 <?= htmlspecialchars($schoolName) ?> (<?= count($group) ?>)</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>School Number</th>
-                    <th>Name</th>
-                    <th>Grade Level</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($group as $det): ?>
-                <tr>
-                    <td><?= htmlspecialchars($det['id_number']) ?></td>
-                    <td><?= htmlspecialchars($det['name']) ?></td>
-                    <td><?= htmlspecialchars($det['grade_level'] ?? 'N/A') ?></td>
-                    <td class="action-buttons">
-                        <button class="btn-edit" onclick="editItem('detainee', <?= htmlspecialchars(json_encode($det)) ?>)">✎ Edit</button>
-                        <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this detainee?')">
-                            <input type="hidden" name="action" value="archive_detainee">
-                            <input type="hidden" name="detainee_id" value="<?= $det['id'] ?>">
-                            <button class="btn-delete" type="submit">🗑 Delete</button>
-                        </form>
-                        <form style="display:inline; margin-left:6px;" method="POST" onsubmit="return confirm('Send password reset email to this detainee?')">
-                            <input type="hidden" name="action" value="send_reset_email">
-                            <input type="hidden" name="role" value="detainee">
-                            <input type="hidden" name="user_id" value="<?= $det['id'] ?>">
-                            <button type="submit" style="background:#06b6d4;color:white;border:0;padding:6px;border-radius:6px;">📧 Reset</button>
-                        </form>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+        <h3 class="group-heading">
+            <span class="group-badge">🏫 <?= htmlspecialchars($schoolName) ?></span>
+            <span class="group-count">(<?= count($group) ?> student<?= count($group) != 1 ? 's' : '' ?>)</span>
+        </h3>
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>School Number</th>
+                        <th>Name</th>
+                        <th>Grade Level</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($group as $det): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($det['id_number']) ?></td>
+                        <td><?= htmlspecialchars($det['name']) ?></td>
+                        <td><?= htmlspecialchars($det['grade_level'] ?? 'N/A') ?></td>
+                        <td class="action-buttons">
+                            <button class="btn-edit" onclick="editItem('detainee', <?= htmlspecialchars(json_encode($det)) ?>)">✎ Edit</button>
+                            <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this student?')">
+                                <input type="hidden" name="action" value="archive_detainee">
+                                <input type="hidden" name="detainee_id" value="<?= $det['id'] ?>">
+                                <button class="btn-delete" type="submit">🗑</button>
+                            </form>
+                            <form style="display:inline; margin-left:4px;" method="POST" onsubmit="return confirm('Send password reset email to this student?')">
+                                <input type="hidden" name="action" value="send_reset_email">
+                                <input type="hidden" name="role" value="detainee">
+                                <input type="hidden" name="user_id" value="<?= $det['id'] ?>">
+                                <button type="submit" style="background:#06b6d4;color:white;border:0;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;">📧</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
         <?php endforeach; ?>
     </div>
 
-    <!-- Edit Detainee Modal -->
+    <!-- Edit Student Modal -->
     <div id="edit_detainee_modal" class="modal">
         <div class="modal-content">
             <span class="modal-close" onclick="closeModal('edit_detainee_modal')">&times;</span>
@@ -1265,9 +1322,9 @@ $providers = getAllProviders($conn);
         </div>
     </div>
 
-    <!-- ========== SUBJECTS SECTION - UPDATED WITH GROUPING BY LEVEL ========== -->
+    <!-- ===== SUBJECTS SECTION ===== -->
     <div class="section <?= $section == 'subjects' ? 'active' : '' ?>">
-        <h2>📚 Subject Management</h2>
+        <h2 class="section-title">Subject Management</h2>
         
         <div class="card">
             <h3>Add New Subject</h3>
@@ -1306,7 +1363,6 @@ $providers = getAllProviders($conn);
         </div>
 
         <?php
-            // Group subjects by level
             $subjectGroups = [];
             foreach ($subjects as $subj) {
                 $level = trim((string)($subj['level'] ?? 'Unspecified'));
@@ -1314,51 +1370,48 @@ $providers = getAllProviders($conn);
                 if (!isset($subjectGroups[$level])) $subjectGroups[$level] = [];
                 $subjectGroups[$level][] = $subj;
             }
-
-            // Define level order
             $levelOrder = ['Elementary', 'High School', 'Senior High School', 'College', 'Unspecified'];
-            
             foreach ($levelOrder as $levelName) :
                 if (!isset($subjectGroups[$levelName])) continue;
                 $group = $subjectGroups[$levelName];
         ?>
-        <h3 style="margin-top:24px;color:#0f172a;display:flex;align-items:center;gap:8px;">
-            <span style="display:inline-block;padding:6px 16px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border-radius:20px;font-size:14px;font-weight:600;">
-                <?= htmlspecialchars($levelName) ?>
-            </span>
-            <span style="font-size:16px;color:#64748b;">(<?= count($group) ?> subject<?= count($group) != 1 ? 's' : '' ?>)</span>
+        <h3 class="group-heading">
+            <span class="group-badge"><?= htmlspecialchars($levelName) ?></span>
+            <span class="group-count">(<?= count($group) ?> subject<?= count($group) != 1 ? 's' : '' ?>)</span>
         </h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Code</th>
-                    <th>Title</th>
-                    <th>Description</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($group as $subj): ?>
-                <tr>
-                    <td><strong style="color:#2563eb;"><?= htmlspecialchars($subj['subject_code']) ?></strong></td>
-                    <td><?= htmlspecialchars($subj['title']) ?></td>
-                    <td style="color:#64748b;"><?= htmlspecialchars($subj['description'] ?? '—') ?></td>
-                    <td class="action-buttons">
-                        <button class="btn-edit" onclick="editItem('subject', <?= htmlspecialchars(json_encode($subj)) ?>)">✎ Edit</button>
-                        <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this subject?')">
-                            <input type="hidden" name="action" value="archive_subject">
-                            <input type="hidden" name="subject_id" value="<?= $subj['id'] ?>">
-                            <button class="btn-delete" type="submit">🗑 Delete</button>
-                        </form>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Title</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($group as $subj): ?>
+                    <tr>
+                        <td><strong style="color:var(--portal-primary,#4f772d)"><?= htmlspecialchars($subj['subject_code']) ?></strong></td>
+                        <td><?= htmlspecialchars($subj['title']) ?></td>
+                        <td style="color:#64748b"><?= htmlspecialchars($subj['description'] ?? '—') ?></td>
+                        <td class="action-buttons">
+                            <button class="btn-edit" onclick="editItem('subject', <?= htmlspecialchars(json_encode($subj)) ?>)">✎ Edit</button>
+                            <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this subject?')">
+                                <input type="hidden" name="action" value="archive_subject">
+                                <input type="hidden" name="subject_id" value="<?= $subj['id'] ?>">
+                                <button class="btn-delete" type="submit">🗑</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
         <?php endforeach; ?>
     </div>
 
-    <!-- Edit Subject Modal - UPDATED WITH REQUIRED LEVEL -->
+    <!-- Edit Subject Modal -->
     <div id="edit_subject_modal" class="modal">
         <div class="modal-content">
             <span class="modal-close" onclick="closeModal('edit_subject_modal')">&times;</span>
@@ -1396,7 +1449,7 @@ $providers = getAllProviders($conn);
                 </div>
                 <div class="form-row full">
                     <div class="form-group">
-                        <label>Dropbox (Upload file)</label>
+                        <label>Upload file (optional)</label>
                         <input type="file" name="subject_file" accept=".pdf,.doc,.docx,.zip,.ppt,.pptx">
                     </div>
                 </div>
@@ -1405,9 +1458,9 @@ $providers = getAllProviders($conn);
         </div>
     </div>
 
-    <!-- GRADE LEVELS SECTION -->
+    <!-- ===== GRADE LEVELS SECTION ===== -->
     <div class="section <?= $section == 'grades' ? 'active' : '' ?>">
-        <h2>📊 Grade Level Management</h2>
+        <h2 class="section-title">Grade Level Management</h2>
         
         <div class="card">
             <h3>Add New Grade Level</h3>
@@ -1423,29 +1476,31 @@ $providers = getAllProviders($conn);
             </form>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Level</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach($grade_levels as $gl): ?>
-                <tr>
-                    <td><?= htmlspecialchars($gl['level']) ?></td>
-                    <td class="action-buttons">
-                        <button class="btn-edit" onclick="editItem('grade_level', <?= htmlspecialchars(json_encode($gl)) ?>)">✎ Edit</button>
-                        <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this grade level?')">
-                            <input type="hidden" name="action" value="archive_grade_level">
-                            <input type="hidden" name="grade_level_id" value="<?= $gl['id'] ?>">
-                            <button class="btn-delete" type="submit">🗑 Delete</button>
-                        </form>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Level</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach($grade_levels as $gl): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($gl['level']) ?></td>
+                        <td class="action-buttons">
+                            <button class="btn-edit" onclick="editItem('grade_level', <?= htmlspecialchars(json_encode($gl)) ?>)">✎ Edit</button>
+                            <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this grade level?')">
+                                <input type="hidden" name="action" value="archive_grade_level">
+                                <input type="hidden" name="grade_level_id" value="<?= $gl['id'] ?>">
+                                <button class="btn-delete" type="submit">🗑</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- Edit Grade Level Modal -->
@@ -1459,7 +1514,7 @@ $providers = getAllProviders($conn);
                 <div class="form-row full">
                     <div class="form-group">
                         <label>Level <span class="required">*</span></label>
-                        <input type="text" name="level" id="edit_grade_level_level" placeholder="e.g., Grade 7, Grade 8, Grade 9..." required>
+                        <input type="text" name="level" id="edit_grade_level_level" placeholder="e.g., Grade 7, Grade 8..." required>
                     </div>
                 </div>
                 <button type="submit">Update Grade Level</button>
@@ -1467,9 +1522,9 @@ $providers = getAllProviders($conn);
         </div>
     </div>
 
-    <!-- PROVIDERS SECTION -->
+    <!-- ===== PROVIDERS SECTION ===== -->
     <div class="section <?= $section == 'providers' ? 'active' : '' ?>">
-        <h2>🏢 Provider Management</h2>
+        <h2 class="section-title">Provider Management</h2>
         
         <div class="card">
             <h3>Add New Provider</h3>
@@ -1499,33 +1554,35 @@ $providers = getAllProviders($conn);
             </form>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>School Number</th>
-                    <th>Name</th>
-                    <th>Type</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach($providers as $prov): ?>
-                <tr>
-                    <td><?= htmlspecialchars($prov['id_number']) ?></td>
-                    <td><?= htmlspecialchars($prov['name']) ?></td>
-                    <td><?= htmlspecialchars($prov['provider_type']) ?></td>
-                    <td class="action-buttons">
-                        <button class="btn-edit" onclick="editItem('provider', <?= htmlspecialchars(json_encode($prov)) ?>)">✎ Edit</button>
-                        <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this provider?')">
-                            <input type="hidden" name="action" value="archive_provider">
-                            <input type="hidden" name="provider_id" value="<?= $prov['id'] ?>">
-                            <button class="btn-delete" type="submit">🗑 Delete</button>
-                        </form>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+        <div class="table-card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>School Number</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach($providers as $prov): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($prov['id_number']) ?></td>
+                        <td><?= htmlspecialchars($prov['name']) ?></td>
+                        <td><?= htmlspecialchars($prov['provider_type']) ?></td>
+                        <td class="action-buttons">
+                            <button class="btn-edit" onclick="editItem('provider', <?= htmlspecialchars(json_encode($prov)) ?>)">✎ Edit</button>
+                            <form style="display:inline;" method="POST" onsubmit="return confirm('Delete this provider?')">
+                                <input type="hidden" name="action" value="archive_provider">
+                                <input type="hidden" name="provider_id" value="<?= $prov['id'] ?>">
+                                <button class="btn-delete" type="submit">🗑</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- Edit Provider Modal -->
@@ -1538,7 +1595,7 @@ $providers = getAllProviders($conn);
                 <input type="hidden" name="provider_id" id="edit_provider_id">
                 <div class="form-row">
                     <div class="form-group">
-                        <label>School Number<span class="required">*</span></label>
+                        <label>School Number <span class="required">*</span></label>
                         <input type="text" name="id_number" id="edit_provider_id_number" required>
                     </div>
                     <div class="form-group">
@@ -1561,69 +1618,42 @@ $providers = getAllProviders($conn);
         </div>
     </div>
 
-</div>
+    </div><!-- /.main-container -->
+</div><!-- /.main-content -->
+
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script>
-// EmailJS Configuration
 const EMAILJS_PUBLIC_KEY = "bjKEcCXpriGPTWoIB";
 const EMAILJS_SERVICE_ID = "service_4viy27k";
 const EMAILJS_TEMPLATE_ID = "template_1axzswl";
-
-// Initialize EmailJS
 emailjs.init(EMAILJS_PUBLIC_KEY);
-console.log('✅ EmailJS initialized');
 
-// Intercept all password reset form submissions
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🔍 Looking for reset forms...');
-    
     const allForms = document.querySelectorAll('form');
-    console.log('Found', allForms.length, 'forms total');
-    
     allForms.forEach((form, index) => {
         const actionInput = form.querySelector('input[name="action"][value="send_reset_email"]');
-        
         if (actionInput) {
-            console.log('✅ Found reset form #' + index);
-            
             form.addEventListener('submit', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                
-                console.log('🚀 Reset form submitted!');
-                
                 const formData = new FormData(this);
                 const role = formData.get('role');
                 const userId = formData.get('user_id');
-                
-                console.log('=== Password Reset via EmailJS ===');
-                console.log('Role:', role);
-                console.log('User ID:', userId);
-                
                 const submitButton = this.querySelector('button[type="submit"]');
                 const originalText = submitButton.innerHTML;
                 submitButton.disabled = true;
-                submitButton.innerHTML = '⏳ Sending...';
-                
+                submitButton.innerHTML = '⏳';
                 fetch('admin_reset_handler.php', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: 'action=generate_reset_token&role=' + encodeURIComponent(role) + '&user_id=' + encodeURIComponent(userId)
                 })
-                .then(response => {
-                    console.log('📡 Got response from PHP');
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
-                    console.log('📦 PHP Response:', data);
-                    
                     if (data.success) {
                         const resetLink = window.location.origin + 
                                         window.location.pathname.replace('admin_dashboard.php', 'reset_password.php') + 
                                         '?token=' + data.token;
-                        
                         const templateParams = {
                             to_email: data.email,
                             name: data.name,
@@ -1631,29 +1661,21 @@ document.addEventListener('DOMContentLoaded', function() {
                             email: data.email,
                             year: new Date().getFullYear()
                         };
-                        
-                        console.log('📧 Sending email to:', data.email);
-                        console.log('🔗 Reset link:', resetLink);
-                        console.log('📨 Template params:', templateParams);
-                        
                         return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
                     } else {
                         throw new Error(data.message || 'Failed to generate reset token');
                     }
                 })
                 .then(response => {
-                    console.log('✅ EmailJS SUCCESS!', response);
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalText;
                     showNotifModal('✅ Password reset email sent successfully!');
                 })
                 .catch(error => {
-                    console.error('❌ Error:', error);
                     submitButton.disabled = false;
                     submitButton.innerHTML = originalText;
                     showNotifModal('❌ Failed to send reset email: ' + error.message);
                 });
-                
                 return false;
             });
         }
