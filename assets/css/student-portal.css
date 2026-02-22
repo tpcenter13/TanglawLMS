@@ -28,7 +28,7 @@ body.role-student .student-header {
     top: 0;
     left: 280px;
     width: calc(100% - 280px);
-    background: linear-gradient(120deg, var(--portal-brand-700), var(--portal-brand-600));
+    background: linear-gradient(120deg, #023047, #034563);
     color: #fff;
     padding: 18px 32px;
     z-index: 150;

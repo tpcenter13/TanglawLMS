@@ -216,7 +216,7 @@ $collected_submissions = $conn->query("SELECT s.*, det.name, a.title as activity
     <link rel="stylesheet" href="assets/css/portal-shared.css">
     <style>
         .facilitator-header {
-            background: linear-gradient(120deg, var(--portal-primary), var(--portal-primary-2));
+            background: linear-gradient(120deg, #023047, #034563);
             color: white;
             padding: 18px 32px;
             border-radius: 0;

@@ -416,51 +416,51 @@ function getSidebarIcon($key) {
     }
 
     body.role-teacher .sidebar { 
-        background: #f59e0b;
+        background: #023047;
     }
 
     body.role-teacher .collapse-toggle {
-        border-color: #f59e0b;
+        border-color: #023047;
     }
 
     body.role-teacher .sidebar-toggle {
-        background: #f59e0b;
+        background: #023047;
     }
 
     body.role-teacher .sidebar-toggle:hover {
-        background: #d97706;
+        background: #034563;
     }
 
     body.role-facilitator .sidebar { 
-        background: #7c3aed;
+        background: #023047;
     }
 
     body.role-facilitator .collapse-toggle {
-        border-color: #7c3aed;
+        border-color: #023047;
     }
 
     body.role-facilitator .sidebar-toggle {
-        background: #7c3aed;
+        background: #023047;
     }
 
     body.role-facilitator .sidebar-toggle:hover {
-        background: #6d28d9;
+        background: #034563;
     }
 
     body.role-student .sidebar { 
-        background: #0b1c33;
+        background: #023047;
     }
 
     body.role-student .collapse-toggle {
-        border-color: #0b1c33;
+        border-color: #023047;
     }
 
     body.role-student .sidebar-toggle {
-        background: #0b1c33;
+        background: #023047;
     }
 
     body.role-student .sidebar-toggle:hover {
-        background: #173a6b;
+        background: #034563;
     }
 
     /* Tablet and Mobile Responsive */

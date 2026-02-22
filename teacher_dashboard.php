@@ -453,7 +453,7 @@ $recentSubmissions = array_slice($submissions, 0, 5);
     <!-- Dashboard v1.1 - If styles don't update, clear browser cache: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac) -->
     <style>
         .teacher-header {
-            background: linear-gradient(120deg, var(--portal-primary), var(--portal-primary-2));
+            background: linear-gradient(120deg, #023047, #034563);
             color: white;
             padding: 18px 32px;
             border-radius: 0;
