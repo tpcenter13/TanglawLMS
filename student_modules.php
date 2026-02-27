@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 ob_start();
 include 'conn.php';
 include 'config_portal.php';

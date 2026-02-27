@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 include 'conn.php';
 include 'config_portal.php';
 

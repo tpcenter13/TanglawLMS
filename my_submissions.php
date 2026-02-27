@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 include 'conn.php';
 
 if (!isset($_SESSION['loggedUser'])) {
