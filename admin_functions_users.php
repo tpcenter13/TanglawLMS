@@ -133,8 +133,6 @@ function sendViaPHPMailer($toEmail, $subject, $bodyHtml) {
         $mail->Password   = MAIL_SMTP_PASSWORD;
         $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = MAIL_SMTP_PORT;
-        // Enable SMTP debug for troubleshooting. Set to 0 to disable.
-        // NOTE: This outputs debug info to the page (HTML). Remove or set to 0 after testing.
         $mail->SMTPDebug  = 2;
         $mail->Debugoutput = 'html';
 
@@ -160,23 +158,18 @@ function sendViaPHPMailer($toEmail, $subject, $bodyHtml) {
 
 /**
  * Add Teacher
- * @param mysqli $conn
- * @param string $id_number - Unique ID Number
- * @param string $name
- * @param string $position
- * @return array - ['success' => bool, 'message' => string]
  */
 function addTeacher($conn, $id_number, $name, $email, $position, $provider_id = null, $level = null, $profile_file = null, $adminPassword = null) {
     // ===== VALIDATION: Password length =====
     if (!empty($adminPassword) && strlen($adminPassword) < 8) {
         return ['success' => false, 'message' => '❌ Password must be at least 8 characters long'];
     }
-    
+
     // ===== VALIDATION: Required provider_id for teachers =====
     if (empty($provider_id)) {
         return ['success' => false, 'message' => '❌ School/Provider is required for teachers'];
     }
-    
+
     // Check for duplicate ID Number
     $checkStmt = $conn->prepare("SELECT id FROM teachers WHERE id_number = ?");
     $checkStmt->bind_param("s", $id_number);
@@ -185,7 +178,7 @@ function addTeacher($conn, $id_number, $name, $email, $position, $provider_id = 
         return ['success' => false, 'message' => '❌ ID Number already exists'];
     }
     $checkStmt->close();
-    
+
     // Check for duplicate name
     $checkStmt = $conn->prepare("SELECT id FROM teachers WHERE LOWER(name) = LOWER(?)");
     $checkStmt->bind_param("s", $name);
@@ -194,7 +187,7 @@ function addTeacher($conn, $id_number, $name, $email, $position, $provider_id = 
         return ['success' => false, 'message' => '❌ Teacher name already exists'];
     }
     $checkStmt->close();
-    
+
     // Check for duplicate email (if provided)
     if (!empty($email)) {
         $checkStmt = $conn->prepare("SELECT id FROM teachers WHERE email = ?");
@@ -219,59 +212,63 @@ function addTeacher($conn, $id_number, $name, $email, $position, $provider_id = 
 
     // Ensure password column exists and set password for the new account
     ensurePasswordColumn($conn, 'teachers');
-    if (!empty($adminPassword)) {
-        $plainPassword = $adminPassword;
-    } else {
-        $plainPassword = generateRandomPassword(10);
-    }
+    $plainPassword  = !empty($adminPassword) ? $adminPassword : generateRandomPassword(10);
     $hashedPassword = password_hash($plainPassword, PASSWORD_DEFAULT);
 
     // Build insert dynamically depending on columns available
-    $cols = ['id_number','name','email','position','password'];
-    $placeholders = ['?','?','?','?','?'];
-    $types = 'sssss';
-    $values = [$id_number, $name, $email, $position, $hashedPassword];
+    $cols         = ['id_number', 'name', 'email', 'position', 'password'];
+    $placeholders = ['?', '?', '?', '?', '?'];
+    $types        = 'sssss';
+    $values       = [$id_number, $name, $email, $position, $hashedPassword];
 
-    // Only add provider_id if column exists AND a valid ID was provided
     if (hasColumn($conn, 'teachers', 'provider_id') && !empty($provider_id)) {
-        $cols[] = 'provider_id';
+        $cols[]         = 'provider_id';
         $placeholders[] = '?';
-        $types .= 'i';
-        $values[] = (int)$provider_id;
-    }
-    
-    if (hasColumn($conn, 'teachers', 'level') && $level !== null) {
-        $cols[] = 'level';
-        $placeholders[] = '?';
-        $types .= 's';
-        $values[] = $level;
-    }
-    if (hasColumn($conn, 'teachers', 'profile_file') && $profile_file !== null) {
-        $cols[] = 'profile_file';
-        $placeholders[] = '?';
-        $types .= 's';
-        $values[] = $profile_file;
+        $types         .= 'i';
+        $values[]       = (int)$provider_id;
     }
 
-    $sql = "INSERT INTO teachers (" . implode(",", $cols) . ") VALUES (" . implode(",", $placeholders) . ")";
+    if (hasColumn($conn, 'teachers', 'level') && $level !== null) {
+        $cols[]         = 'level';
+        $placeholders[] = '?';
+        $types         .= 's';
+        $values[]       = $level;
+    }
+
+    if (hasColumn($conn, 'teachers', 'profile_file') && $profile_file !== null) {
+        $cols[]         = 'profile_file';
+        $placeholders[] = '?';
+        $types         .= 's';
+        $values[]       = $profile_file;
+    }
+
+    $sql  = "INSERT INTO teachers (" . implode(",", $cols) . ") VALUES (" . implode(",", $placeholders) . ")";
     $stmt = $conn->prepare($sql);
+
     if ($stmt) {
-        // bind params dynamically
-        $bind_names = [];
-        $bind_names[] = & $types;
+        $bind_names   = [];
+        $bind_names[] = &$types;
         for ($i = 0; $i < count($values); $i++) {
-            $bind_names[] = & $values[$i];
+            $bind_names[] = &$values[$i];
         }
         call_user_func_array([$stmt, 'bind_param'], $bind_names);
     }
-    
+
     if ($stmt && $stmt->execute()) {
         $stmt->close();
-        // Send notification email if email provided (include plain password if available)
+        // Send notification email
         if (!empty($email)) {
             sendUserNotification($email, 'Teacher', $id_number, $name, $plainPassword);
         }
-        return ['success' => true, 'message' => '✅ Teacher added successfully'];
+        // ✅ FIX: return all fields needed for welcome email
+        return [
+            'success'   => true,
+            'message'   => '✅ Teacher added successfully',
+            'email'     => $email,
+            'name'      => $name,
+            'id_number' => $id_number,
+            'password'  => $plainPassword,
+        ];
     } else {
         if ($stmt) { $stmt->close(); }
         return ['success' => false, 'message' => '❌ Error adding teacher: ' . $conn->error];
@@ -282,17 +279,14 @@ function addTeacher($conn, $id_number, $name, $email, $position, $provider_id = 
  * Edit Teacher
  */
 function editTeacher($conn, $teacher_id, $id_number, $name, $email, $position, $provider_id = null, $level = null, $profile_file = null, $newPassword = null) {
-    // ===== VALIDATION: Password length =====
     if (!empty($newPassword) && strlen($newPassword) < 8) {
         return ['success' => false, 'message' => '❌ Password must be at least 8 characters long'];
     }
-    
-    // ===== VALIDATION: Required provider_id for teachers =====
+
     if (empty($provider_id)) {
         return ['success' => false, 'message' => '❌ School/Provider is required for teachers'];
     }
-    
-    // Check if new ID Number exists elsewhere
+
     $checkStmt = $conn->prepare("SELECT id FROM teachers WHERE id_number = ? AND id != ?");
     $checkStmt->bind_param("si", $id_number, $teacher_id);
     $checkStmt->execute();
@@ -300,8 +294,7 @@ function editTeacher($conn, $teacher_id, $id_number, $name, $email, $position, $
         return ['success' => false, 'message' => '❌ ID Number already exists'];
     }
     $checkStmt->close();
-    
-    // Check if new name exists elsewhere
+
     $checkStmt = $conn->prepare("SELECT id FROM teachers WHERE LOWER(name) = LOWER(?) AND id != ?");
     $checkStmt->bind_param("si", $name, $teacher_id);
     $checkStmt->execute();
@@ -309,8 +302,7 @@ function editTeacher($conn, $teacher_id, $id_number, $name, $email, $position, $
         return ['success' => false, 'message' => '❌ Teacher name already exists'];
     }
     $checkStmt->close();
-    
-    // Check email uniqueness
+
     if (!empty($email)) {
         $checkStmt = $conn->prepare("SELECT id FROM teachers WHERE email = ? AND id != ?");
         $checkStmt->bind_param("si", $email, $teacher_id);
@@ -321,49 +313,44 @@ function editTeacher($conn, $teacher_id, $id_number, $name, $email, $position, $
         $checkStmt->close();
     }
 
-    // Build update dynamically
-    $sets = ['id_number = ?', 'name = ?', 'email = ?', 'position = ?'];
-    $types = 'ssss';
+    $sets   = ['id_number = ?', 'name = ?', 'email = ?', 'position = ?'];
+    $types  = 'ssss';
     $values = [$id_number, $name, $email, $position];
 
-    // Always update provider_id if column exists (including setting to NULL/0 for empty values)
     if (hasColumn($conn, 'teachers', 'provider_id')) {
-        $sets[] = 'provider_id = ?';
-        $types .= 'i';
+        $sets[]   = 'provider_id = ?';
+        $types   .= 'i';
         $values[] = !empty($provider_id) ? (int)$provider_id : 0;
     }
-    
-    // Always update level if column exists
+
     if (hasColumn($conn, 'teachers', 'level')) {
-        $sets[] = 'level = ?';
-        $types .= 's';
+        $sets[]   = 'level = ?';
+        $types   .= 's';
         $values[] = !empty($level) ? $level : '';
     }
-    
-    // Only update profile_file if a new file was uploaded
+
     if (hasColumn($conn, 'teachers', 'profile_file') && $profile_file !== null) {
-        $sets[] = 'profile_file = ?';
-        $types .= 's';
+        $sets[]   = 'profile_file = ?';
+        $types   .= 's';
         $values[] = $profile_file;
     }
 
-    $sql = "UPDATE teachers SET " . implode(', ', $sets) . " WHERE id = ?";
+    $sql      = "UPDATE teachers SET " . implode(', ', $sets) . " WHERE id = ?";
     $values[] = $teacher_id;
-    $types .= 'i';
+    $types   .= 'i';
 
     $stmt = $conn->prepare($sql);
     if ($stmt) {
-        $bind_names = [];
-        $bind_names[] = & $types;
+        $bind_names   = [];
+        $bind_names[] = &$types;
         for ($i = 0; $i < count($values); $i++) {
-            $bind_names[] = & $values[$i];
+            $bind_names[] = &$values[$i];
         }
         call_user_func_array([$stmt, 'bind_param'], $bind_names);
     }
-    
+
     if ($stmt && $stmt->execute()) {
         $stmt->close();
-        // If admin provided a new password, set it
         if (!empty($newPassword)) {
             setUserPassword($conn, 'teacher', $teacher_id, $newPassword);
         }
@@ -380,7 +367,7 @@ function editTeacher($conn, $teacher_id, $id_number, $name, $email, $position, $
 function archiveTeacher($conn, $teacher_id) {
     $stmt = $conn->prepare("UPDATE teachers SET archived = 1 WHERE id = ?");
     $stmt->bind_param("i", $teacher_id);
-    
+
     if ($stmt->execute()) {
         $stmt->close();
         return ['success' => true, 'message' => '✅ Teacher archived successfully'];
@@ -394,20 +381,14 @@ function archiveTeacher($conn, $teacher_id) {
  * Get All Teachers (active only)
  */
 function getAllTeachers($conn, $includeArchived = false) {
-    // If teachers table has provider_id, join providers to include provider name
     if (hasColumn($conn, 'teachers', 'provider_id')) {
-        if ($includeArchived) {
-            $query = "SELECT t.*, p.name AS provider_name, t.provider_id FROM teachers t LEFT JOIN providers p ON t.provider_id = p.id ORDER BY t.name ASC";
-        } else {
-            $query = "SELECT t.*, p.name AS provider_name, t.provider_id FROM teachers t LEFT JOIN providers p ON t.provider_id = p.id WHERE t.archived = 0 ORDER BY t.name ASC";
-        }
+        $query = $includeArchived
+            ? "SELECT t.*, p.name AS provider_name, t.provider_id FROM teachers t LEFT JOIN providers p ON t.provider_id = p.id ORDER BY t.name ASC"
+            : "SELECT t.*, p.name AS provider_name, t.provider_id FROM teachers t LEFT JOIN providers p ON t.provider_id = p.id WHERE t.archived = 0 ORDER BY t.name ASC";
     } else {
-        // Fallback for older DB schema
-        if ($includeArchived) {
-            $query = "SELECT * FROM teachers ORDER BY name ASC";
-        } else {
-            $query = "SELECT * FROM teachers WHERE archived = 0 ORDER BY name ASC";
-        }
+        $query = $includeArchived
+            ? "SELECT * FROM teachers ORDER BY name ASC"
+            : "SELECT * FROM teachers WHERE archived = 0 ORDER BY name ASC";
     }
     $result = $conn->query($query);
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
@@ -419,12 +400,10 @@ function getAllTeachers($conn, $includeArchived = false) {
  * Add Facilitator
  */
 function addFacilitator($conn, $id_number, $name, $email, $position, $employment_status, $adminPassword = null) {
-    // ===== VALIDATION: Password length =====
     if (!empty($adminPassword) && strlen($adminPassword) < 8) {
         return ['success' => false, 'message' => '❌ Password must be at least 8 characters long'];
     }
-    
-    // Check for duplicate ID Number
+
     $checkStmt = $conn->prepare("SELECT id FROM facilitators WHERE id_number = ?");
     $checkStmt->bind_param("s", $id_number);
     $checkStmt->execute();
@@ -432,8 +411,7 @@ function addFacilitator($conn, $id_number, $name, $email, $position, $employment
         return ['success' => false, 'message' => '❌ ID Number already exists'];
     }
     $checkStmt->close();
-    
-    // Check for duplicate name
+
     $checkStmt = $conn->prepare("SELECT id FROM facilitators WHERE LOWER(name) = LOWER(?)");
     $checkStmt->bind_param("s", $name);
     $checkStmt->execute();
@@ -441,8 +419,7 @@ function addFacilitator($conn, $id_number, $name, $email, $position, $employment
         return ['success' => false, 'message' => '❌ Facilitator name already exists'];
     }
     $checkStmt->close();
-    
-    // Check for duplicate email (if provided)
+
     if (!empty($email)) {
         $checkStmt = $conn->prepare("SELECT id FROM facilitators WHERE email = ?");
         $checkStmt->bind_param("s", $email);
@@ -453,24 +430,27 @@ function addFacilitator($conn, $id_number, $name, $email, $position, $employment
         $checkStmt->close();
     }
 
-    // Ensure password column exists and set password
     ensurePasswordColumn($conn, 'facilitators');
-    if (!empty($adminPassword)) {
-        $plainPassword = $adminPassword;
-    } else {
-        $plainPassword = generateRandomPassword(10);
-    }
+    $plainPassword  = !empty($adminPassword) ? $adminPassword : generateRandomPassword(10);
     $hashedPassword = password_hash($plainPassword, PASSWORD_DEFAULT);
 
     $stmt = $conn->prepare("INSERT INTO facilitators (id_number, name, email, position, employment_status, password) VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->bind_param("ssssss", $id_number, $name, $email, $position, $employment_status, $hashedPassword);
-    
+
     if ($stmt->execute()) {
         $stmt->close();
         if (!empty($email)) {
             sendUserNotification($email, 'Facilitator', $id_number, $name, $plainPassword);
         }
-        return ['success' => true, 'message' => '✅ Facilitator added successfully'];
+        // ✅ FIX: return all fields needed for welcome email
+        return [
+            'success'   => true,
+            'message'   => '✅ Facilitator added successfully',
+            'email'     => $email,
+            'name'      => $name,
+            'id_number' => $id_number,
+            'password'  => $plainPassword,
+        ];
     } else {
         $stmt->close();
         return ['success' => false, 'message' => '❌ Error adding facilitator'];
@@ -481,12 +461,10 @@ function addFacilitator($conn, $id_number, $name, $email, $position, $employment
  * Edit Facilitator
  */
 function editFacilitator($conn, $facilitator_id, $id_number, $name, $email, $position, $employment_status, $newPassword = null) {
-    // ===== VALIDATION: Password length =====
     if (!empty($newPassword) && strlen($newPassword) < 8) {
         return ['success' => false, 'message' => '❌ Password must be at least 8 characters long'];
     }
-    
-    // Check if new ID Number exists elsewhere
+
     $checkStmt = $conn->prepare("SELECT id FROM facilitators WHERE id_number = ? AND id != ?");
     $checkStmt->bind_param("si", $id_number, $facilitator_id);
     $checkStmt->execute();
@@ -494,8 +472,7 @@ function editFacilitator($conn, $facilitator_id, $id_number, $name, $email, $pos
         return ['success' => false, 'message' => '❌ ID Number already exists'];
     }
     $checkStmt->close();
-    
-    // Check if new name exists elsewhere
+
     $checkStmt = $conn->prepare("SELECT id FROM facilitators WHERE LOWER(name) = LOWER(?) AND id != ?");
     $checkStmt->bind_param("si", $name, $facilitator_id);
     $checkStmt->execute();
@@ -503,8 +480,7 @@ function editFacilitator($conn, $facilitator_id, $id_number, $name, $email, $pos
         return ['success' => false, 'message' => '❌ Facilitator name already exists'];
     }
     $checkStmt->close();
-    
-    // Check email uniqueness
+
     if (!empty($email)) {
         $checkStmt = $conn->prepare("SELECT id FROM facilitators WHERE email = ? AND id != ?");
         $checkStmt->bind_param("si", $email, $facilitator_id);
@@ -517,7 +493,7 @@ function editFacilitator($conn, $facilitator_id, $id_number, $name, $email, $pos
 
     $stmt = $conn->prepare("UPDATE facilitators SET id_number = ?, name = ?, email = ?, position = ?, employment_status = ? WHERE id = ?");
     $stmt->bind_param("sssssi", $id_number, $name, $email, $position, $employment_status, $facilitator_id);
-    
+
     if ($stmt->execute()) {
         $stmt->close();
         if (!empty($newPassword)) {
@@ -536,7 +512,7 @@ function editFacilitator($conn, $facilitator_id, $id_number, $name, $email, $pos
 function archiveFacilitator($conn, $facilitator_id) {
     $stmt = $conn->prepare("UPDATE facilitators SET archived = 1 WHERE id = ?");
     $stmt->bind_param("i", $facilitator_id);
-    
+
     if ($stmt->execute()) {
         $stmt->close();
         return ['success' => true, 'message' => '✅ Facilitator archived successfully'];
@@ -550,10 +526,9 @@ function archiveFacilitator($conn, $facilitator_id) {
  * Get All Facilitators (active only)
  */
 function getAllFacilitators($conn, $includeArchived = false) {
-    $query = "SELECT * FROM facilitators WHERE archived = 0 ORDER BY name ASC";
-    if ($includeArchived) {
-        $query = "SELECT * FROM facilitators ORDER BY name ASC";
-    }
+    $query = $includeArchived
+        ? "SELECT * FROM facilitators ORDER BY name ASC"
+        : "SELECT * FROM facilitators WHERE archived = 0 ORDER BY name ASC";
     $result = $conn->query($query);
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
@@ -564,17 +539,14 @@ function getAllFacilitators($conn, $includeArchived = false) {
  * Add Detainee
  */
 function addDetainee($conn, $id_number, $name, $email, $grade_level, $school = null, $adminPassword = null) {
-    // ===== VALIDATION: Password length =====
     if (!empty($adminPassword) && strlen($adminPassword) < 8) {
         return ['success' => false, 'message' => '❌ Password must be at least 8 characters long'];
     }
-    
-    // ===== VALIDATION: Required school for detainees/students =====
+
     if (empty($school)) {
         return ['success' => false, 'message' => '❌ School is required for students'];
     }
-    
-    // Check for duplicate ID Number
+
     $checkStmt = $conn->prepare("SELECT id FROM detainees WHERE id_number = ?");
     $checkStmt->bind_param("s", $id_number);
     $checkStmt->execute();
@@ -582,8 +554,7 @@ function addDetainee($conn, $id_number, $name, $email, $grade_level, $school = n
         return ['success' => false, 'message' => '❌ ID Number already exists'];
     }
     $checkStmt->close();
-    
-    // Check for duplicate name
+
     $checkStmt = $conn->prepare("SELECT id FROM detainees WHERE LOWER(name) = LOWER(?)");
     $checkStmt->bind_param("s", $name);
     $checkStmt->execute();
@@ -591,8 +562,7 @@ function addDetainee($conn, $id_number, $name, $email, $grade_level, $school = n
         return ['success' => false, 'message' => '❌ Detainee name already exists'];
     }
     $checkStmt->close();
-    
-    // Check for duplicate email (if provided)
+
     if (!empty($email)) {
         $checkStmt = $conn->prepare("SELECT id FROM detainees WHERE email = ?");
         $checkStmt->bind_param("s", $email);
@@ -603,33 +573,33 @@ function addDetainee($conn, $id_number, $name, $email, $grade_level, $school = n
         $checkStmt->close();
     }
 
-    // Ensure password column exists and set password for detainee
     ensurePasswordColumn($conn, 'detainees');
-    // ensure school column exists so we can store it
     ensureSchoolColumn($conn);
-    if (!empty($adminPassword)) {
-        $plainPassword = $adminPassword;
-    } else {
-        $plainPassword = generateRandomPassword(8);
-    }
+    $plainPassword  = !empty($adminPassword) ? $adminPassword : generateRandomPassword(8);
     $hashedPassword = password_hash($plainPassword, PASSWORD_DEFAULT);
 
-    // Insert and include school column if it exists
     if (hasColumn($conn, 'detainees', 'school')) {
-        // Store email as NULL when empty to avoid UNIQUE('email') collisions on empty strings
         $stmt = $conn->prepare("INSERT INTO detainees (id_number, name, email, grade_level, school, password) VALUES (?, ?, NULLIF(?,''), ?, ?, ?)");
         $stmt->bind_param("ssssss", $id_number, $name, $email, $grade_level, $school, $hashedPassword);
     } else {
         $stmt = $conn->prepare("INSERT INTO detainees (id_number, name, email, grade_level, password) VALUES (?, ?, NULLIF(?,''), ?, ?)");
         $stmt->bind_param("sssss", $id_number, $name, $email, $grade_level, $hashedPassword);
     }
-    
+
     if ($stmt->execute()) {
         $stmt->close();
         if (!empty($email)) {
-            sendUserNotification($email, 'Detainee', $id_number, $name, $plainPassword);
+            sendUserNotification($email, 'Student', $id_number, $name, $plainPassword);
         }
-        return ['success' => true, 'message' => '✅ Detainee added successfully'];
+        // ✅ FIX: return all fields needed for welcome email
+        return [
+            'success'   => true,
+            'message'   => '✅ Student added successfully',
+            'email'     => $email,
+            'name'      => $name,
+            'id_number' => $id_number,
+            'password'  => $plainPassword,
+        ];
     } else {
         $stmt->close();
         return ['success' => false, 'message' => '❌ Error adding detainee'];
@@ -640,17 +610,14 @@ function addDetainee($conn, $id_number, $name, $email, $grade_level, $school = n
  * Edit Detainee
  */
 function editDetainee($conn, $detainee_id, $id_number, $name, $email, $grade_level, $school = null, $newPassword = null) {
-    // ===== VALIDATION: Password length =====
     if (!empty($newPassword) && strlen($newPassword) < 8) {
         return ['success' => false, 'message' => '❌ Password must be at least 8 characters long'];
     }
-    
-    // ===== VALIDATION: Required school for detainees/students =====
+
     if (empty($school)) {
         return ['success' => false, 'message' => '❌ School is required for students'];
     }
-    
-    // Check if new ID Number exists elsewhere
+
     $checkStmt = $conn->prepare("SELECT id FROM detainees WHERE id_number = ? AND id != ?");
     $checkStmt->bind_param("si", $id_number, $detainee_id);
     $checkStmt->execute();
@@ -658,8 +625,7 @@ function editDetainee($conn, $detainee_id, $id_number, $name, $email, $grade_lev
         return ['success' => false, 'message' => '❌ ID Number already exists'];
     }
     $checkStmt->close();
-    
-    // Check if new name exists elsewhere
+
     $checkStmt = $conn->prepare("SELECT id FROM detainees WHERE LOWER(name) = LOWER(?) AND id != ?");
     $checkStmt->bind_param("si", $name, $detainee_id);
     $checkStmt->execute();
@@ -667,8 +633,7 @@ function editDetainee($conn, $detainee_id, $id_number, $name, $email, $grade_lev
         return ['success' => false, 'message' => '❌ Detainee name already exists'];
     }
     $checkStmt->close();
-    
-    // Check email uniqueness
+
     if (!empty($email)) {
         $checkStmt = $conn->prepare("SELECT id FROM detainees WHERE email = ? AND id != ?");
         $checkStmt->bind_param("si", $email, $detainee_id);
@@ -679,17 +644,15 @@ function editDetainee($conn, $detainee_id, $id_number, $name, $email, $grade_lev
         $checkStmt->close();
     }
 
-    // Ensure school column exists for update if needed
     ensureSchoolColumn($conn);
     if (hasColumn($conn, 'detainees', 'school')) {
-        // Use NULLIF to convert empty email to NULL to prevent UNIQUE constraint on empty strings
         $stmt = $conn->prepare("UPDATE detainees SET id_number = ?, name = ?, email = NULLIF(?,''), grade_level = ?, school = ? WHERE id = ?");
         $stmt->bind_param("sssssi", $id_number, $name, $email, $grade_level, $school, $detainee_id);
     } else {
         $stmt = $conn->prepare("UPDATE detainees SET id_number = ?, name = ?, email = NULLIF(?,''), grade_level = ? WHERE id = ?");
         $stmt->bind_param("ssssi", $id_number, $name, $email, $grade_level, $detainee_id);
     }
-    
+
     if ($stmt->execute()) {
         $stmt->close();
         if (!empty($newPassword)) {
@@ -708,7 +671,7 @@ function editDetainee($conn, $detainee_id, $id_number, $name, $email, $grade_lev
 function archiveDetainee($conn, $detainee_id) {
     $stmt = $conn->prepare("UPDATE detainees SET archived = 1 WHERE id = ?");
     $stmt->bind_param("i", $detainee_id);
-    
+
     if ($stmt->execute()) {
         $stmt->close();
         return ['success' => true, 'message' => '✅ Detainee archived successfully'];
@@ -722,10 +685,9 @@ function archiveDetainee($conn, $detainee_id) {
  * Get All Detainees (active only)
  */
 function getAllDetainees($conn, $includeArchived = false) {
-    $query = "SELECT * FROM detainees WHERE archived = 0 ORDER BY name ASC";
-    if ($includeArchived) {
-        $query = "SELECT * FROM detainees ORDER BY name ASC";
-    }
+    $query = $includeArchived
+        ? "SELECT * FROM detainees ORDER BY name ASC"
+        : "SELECT * FROM detainees WHERE archived = 0 ORDER BY name ASC";
     $result = $conn->query($query);
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
@@ -743,7 +705,7 @@ function bulkGenerateMissingPasswords($conn) {
         if ($res) {
             while ($r = $res->fetch_assoc()) {
                 if (empty($r['password']) && !empty($r['email'])) {
-                    $pw = generateRandomPassword(10);
+                    $pw   = generateRandomPassword(10);
                     $hash = password_hash($pw, PASSWORD_DEFAULT);
                     $stmt = $conn->prepare("UPDATE teachers SET password = ? WHERE id = ?");
                     $stmt->bind_param('si', $hash, $r['id']);
@@ -764,7 +726,7 @@ function bulkGenerateMissingPasswords($conn) {
         if ($res) {
             while ($r = $res->fetch_assoc()) {
                 if (empty($r['password']) && !empty($r['email'])) {
-                    $pw = generateRandomPassword(10);
+                    $pw   = generateRandomPassword(10);
                     $hash = password_hash($pw, PASSWORD_DEFAULT);
                     $stmt = $conn->prepare("UPDATE facilitators SET password = ? WHERE id = ?");
                     $stmt->bind_param('si', $hash, $r['id']);
@@ -785,7 +747,7 @@ function bulkGenerateMissingPasswords($conn) {
         if ($res) {
             while ($r = $res->fetch_assoc()) {
                 if (empty($r['password']) && !empty($r['email'])) {
-                    $pw = generateRandomPassword(8);
+                    $pw   = generateRandomPassword(8);
                     $hash = password_hash($pw, PASSWORD_DEFAULT);
                     $stmt = $conn->prepare("UPDATE detainees SET password = ? WHERE id = ?");
                     $stmt->bind_param('si', $hash, $r['id']);
@@ -817,9 +779,9 @@ function ensurePasswordResetsTable($conn) {
 
 function createPasswordResetToken($conn, $role, $user_id) {
     ensurePasswordResetsTable($conn);
-    $token = bin2hex(random_bytes(24));
+    $token   = bin2hex(random_bytes(24));
     $expires = date('Y-m-d H:i:s', time() + 3600); // 1 hour
-    $stmt = $conn->prepare("INSERT INTO password_resets (user_role, user_id, token, expires_at) VALUES (?, ?, ?, ?)");
+    $stmt    = $conn->prepare("INSERT INTO password_resets (user_role, user_id, token, expires_at) VALUES (?, ?, ?, ?)");
     $stmt->bind_param('siss', $role, $user_id, $token, $expires);
     if ($stmt->execute()) {
         $stmt->close();
@@ -836,13 +798,12 @@ function sendPasswordResetEmail($toEmail, $name, $token) {
         include 'config_email.php';
         $from = defined('MAIL_FROM_EMAIL') ? MAIL_FROM_EMAIL : 'no-reply@localhost';
     }
-    $link = (isset($_SERVER['HTTP_HOST']) ? ('http://' . $_SERVER['HTTP_HOST']) : 'http://localhost') . dirname($_SERVER['PHP_SELF']) . "/reset_password.php?token=" . urlencode($token);
+    $link    = (isset($_SERVER['HTTP_HOST']) ? ('http://' . $_SERVER['HTTP_HOST']) : 'http://localhost') . dirname($_SERVER['PHP_SELF']) . "/reset_password.php?token=" . urlencode($token);
     $subject = 'Tanglaw LMS - Password Reset';
-    $body = "<p>Hello " . htmlspecialchars($name) . ",</p>";
-    $body .= "<p>Click the link below to reset your password (valid 1 hour):<br><a href=\"" . htmlspecialchars($link) . "\">Reset password</a></p>";
-    $body .= "<p>If you did not request this, ignore this email.</p>";
+    $body    = "<p>Hello " . htmlspecialchars($name) . ",</p>";
+    $body   .= "<p>Click the link below to reset your password (valid 1 hour):<br><a href=\"" . htmlspecialchars($link) . "\">Reset password</a></p>";
+    $body   .= "<p>If you did not request this, ignore this email.</p>";
 
-    // Use PHPMailer if available
     if (file_exists('vendor/autoload.php')) {
         return sendViaPHPMailer($toEmail, $subject, $body);
     }
@@ -853,11 +814,9 @@ function sendPasswordResetEmail($toEmail, $name, $token) {
 }
 
 function setUserPassword($conn, $role, $user_id, $plainPassword) {
-    // ===== VALIDATION: Password length =====
     if (strlen($plainPassword) < 8) {
         return false;
     }
-    
     $hash = password_hash($plainPassword, PASSWORD_DEFAULT);
     if ($role === 'teacher') {
         $stmt = $conn->prepare("UPDATE teachers SET password = ? WHERE id = ?");
@@ -873,5 +832,3 @@ function setUserPassword($conn, $role, $user_id, $plainPassword) {
     $stmt->close();
     return $ok;
 }
-
-?>

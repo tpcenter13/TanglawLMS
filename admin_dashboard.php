@@ -13,6 +13,7 @@ if (!isset($_SESSION['loggedUser']) || $_SESSION['loggedUser']['role'] !== 'admi
 // Get current section
 $section = $_GET['section'] ?? 'dashboard';
 $message = '';
+$welcomeEmailData = null; // NEW: Store welcome email data
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -63,7 +64,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 null,
                 !empty($_POST['password']) ? $_POST['password'] : null
             );
+            
+            // DEBUG: Uncomment these lines to see what addTeacher returns
+            /*
+            echo "<pre>";
+            echo "Result from addTeacher:\n";
+            print_r($result);
+            echo "\n\nChecking conditions:\n";
+            echo "success: " . (isset($result['success']) ? ($result['success'] ? 'YES' : 'NO') : 'NOT SET') . "\n";
+            echo "email: " . (isset($result['email']) && !empty($result['email']) ? $result['email'] : 'NOT SET OR EMPTY') . "\n";
+            echo "password: " . (isset($result['password']) && !empty($result['password']) ? 'SET (hidden)' : 'NOT SET OR EMPTY') . "\n";
+            echo "</pre>";
+            die();
+            */
+            
             $message = $result['message'];
+            
+            // NEW: Prepare welcome email data
+            if (isset($result['success']) && $result['success'] && !empty($result['email']) && !empty($result['password'])) {
+                $welcomeEmailData = [
+                    'email' => $result['email'],
+                    'name' => $result['name'],
+                    'id_number' => $result['id_number'],
+                    'password' => $result['password'],
+                    'role' => 'Teacher'
+                ];
+            }
+            
             $section = 'teachers';
         }
     }
@@ -86,6 +113,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         } else {
             $result = addFacilitator($conn, $_POST['id_number'], $_POST['name'], $_POST['email'] ?? '', $_POST['position'] ?? '', $_POST['employment_status'] ?? '', !empty($_POST['password']) ? $_POST['password'] : null);
             $message = $result['message'];
+            
+            // NEW: Prepare welcome email data
+            if (isset($result['success']) && $result['success'] && !empty($result['email']) && !empty($result['password'])) {
+                $welcomeEmailData = [
+                    'email' => $result['email'],
+                    'name' => $result['name'],
+                    'id_number' => $result['id_number'],
+                    'password' => $result['password'],
+                    'role' => 'Facilitator'
+                ];
+            }
         }
     }
     
@@ -120,6 +158,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         } else {
             $result = addDetainee($conn, $_POST['id_number'], $_POST['name'], $_POST['email'] ?? '', $_POST['grade_level'], $_POST['school'] ?? null, !empty($_POST['password']) ? $_POST['password'] : null);
             $message = $result['message'];
+            
+            // NEW: Prepare welcome email data
+            if (isset($result['success']) && $result['success'] && !empty($result['email']) && !empty($result['password'])) {
+                $welcomeEmailData = [
+                    'email' => $result['email'],
+                    'name' => $result['name'],
+                    'id_number' => $result['id_number'],
+                    'password' => $result['password'],
+                    'role' => 'Student'
+                ];
+            }
         }
     }
     
@@ -815,6 +864,25 @@ $providers = getAllProviders($conn);
         });
     </script>
     <?php endif; ?>
+    
+    <?php if ($welcomeEmailData): ?>
+    <script>
+        // NEW: Send welcome email after account creation
+        document.addEventListener('DOMContentLoaded', function(){
+            sendWelcomeEmail(
+                <?= json_encode($welcomeEmailData['email']) ?>,
+                <?= json_encode($welcomeEmailData['name']) ?>,
+                <?= json_encode($welcomeEmailData['id_number']) ?>,
+                <?= json_encode($welcomeEmailData['password']) ?>,
+                <?= json_encode($welcomeEmailData['role']) ?>
+            ).then(function() {
+                console.log('Welcome email sent successfully to <?= htmlspecialchars($welcomeEmailData['email']) ?>');
+            }).catch(function(error) {
+                console.error('Failed to send welcome email:', error);
+            });
+        });
+    </script>
+    <?php endif; ?>
 
     <div class="main-container">
 
@@ -869,8 +937,8 @@ $providers = getAllProviders($conn);
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" name="email" placeholder="user@example.com">
+                        <label>Email <span class="required">*</span></label>
+                        <input type="email" name="email" placeholder="user@example.com" required>
                     </div>
                 </div>
                 <div class="form-row">
@@ -904,7 +972,7 @@ $providers = getAllProviders($conn);
                     <div class="form-group">
                         <label>Password (optional)</label>
                         <input type="password" name="password" placeholder="Leave blank to auto-generate" minlength="8" oninput="validatePassword(this)">
-                        <small class="password-hint">If blank, a random password will be generated. Minimum 8 characters required.</small>
+                        <small class="password-hint">If blank, a random password will be generated and sent via email. Minimum 8 characters required.</small>
                     </div>
                 </div>
                 <button type="submit">Add Teacher</button>
@@ -1035,8 +1103,8 @@ $providers = getAllProviders($conn);
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" name="email" placeholder="user@example.com">
+                        <label>Email <span class="required">*</span></label>
+                        <input type="email" name="email" placeholder="user@example.com" required>
                     </div>
                 </div>
                 <div class="form-row">
@@ -1057,7 +1125,7 @@ $providers = getAllProviders($conn);
                     <div class="form-group">
                         <label>Password (optional)</label>
                         <input type="password" name="password" placeholder="Leave blank to auto-generate" minlength="8" oninput="validatePassword(this)">
-                        <small class="password-hint">If blank, a random password will be generated. Minimum 8 characters required.</small>
+                        <small class="password-hint">If blank, a random password will be generated and sent via email. Minimum 8 characters required.</small>
                     </div>
                 </div>
                 <button type="submit">Add Facilitator</button>
@@ -1173,8 +1241,8 @@ $providers = getAllProviders($conn);
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Email</label>
-                        <input type="email" name="email" placeholder="user@example.com">
+                        <label>Email <span class="required">*</span></label>
+                        <input type="email" name="email" placeholder="user@example.com" required>
                     </div>
                 </div>
                 <div class="form-row">
@@ -1204,7 +1272,7 @@ $providers = getAllProviders($conn);
                     <div class="form-group">
                         <label>Password (optional)</label>
                         <input type="password" name="password" placeholder="Leave blank to auto-generate" minlength="8" oninput="validatePassword(this)">
-                        <small class="password-hint">If blank, a random password will be generated. Minimum 8 characters required.</small>
+                        <small class="password-hint">If blank, a random password will be generated and sent via email. Minimum 8 characters required.</small>
                     </div>
                 </div>
                 <button type="submit">Add Student</button>
@@ -1625,8 +1693,25 @@ $providers = getAllProviders($conn);
 <script>
 const EMAILJS_PUBLIC_KEY = "bjKEcCXpriGPTWoIB";
 const EMAILJS_SERVICE_ID = "service_4viy27k";
-const EMAILJS_TEMPLATE_ID = "template_1axzswl";
+const EMAILJS_TEMPLATE_ID = "template_1axzswl"; // Password reset template
+const EMAILJS_WELCOME_TEMPLATE_ID = "template_d2anqcs"; // NEW: Replace with your welcome template ID
+
 emailjs.init(EMAILJS_PUBLIC_KEY);
+
+// NEW: Function to send welcome email
+function sendWelcomeEmail(email, name, idNumber, password, role) {
+    const templateParams = {
+        to_email: email,
+        name: name,
+        email: email,
+        id_number: idNumber,
+        password: password,
+        role: role,
+        year: new Date().getFullYear()
+    };
+    
+    return emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_WELCOME_TEMPLATE_ID, templateParams);
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     const allForms = document.querySelectorAll('form');
